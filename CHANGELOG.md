@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/Assidefok/SCSGATE/compare/v0.3.0...v0.4.0) (2026-08-02)
+
+
+### Features
+
+* add SCSGATE v0.4 device manager ([a65a88d](https://github.com/Assidefok/SCSGATE/commit/a65a88d1f57c61f5d85e196ccbc3fcd1071353a7))
+
 ## 0.4.0
 
 - Add a dynamic central Device Manager with periodic discovery of new devices.

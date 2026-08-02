@@ -1,10 +1,16 @@
 {
   "domain": "scsgate",
   "name": "SCSGATE",
-  "after_dependencies": ["mqtt"],
-  "codeowners": ["@Assidefok"],
+  "after_dependencies": [
+    "mqtt"
+  ],
+  "codeowners": [
+    "@Assidefok"
+  ],
   "config_flow": true,
-  "dependencies": ["mqtt"],
+  "dependencies": [
+    "mqtt"
+  ],
   "documentation": "https://github.com/Assidefok/SCSGATE",
   "integration_type": "hub",
   "iot_class": "local_polling",
