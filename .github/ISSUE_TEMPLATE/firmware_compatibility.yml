@@ -1,0 +1,40 @@
+name: Firmware compatibility
+description: Report a sanitized parser or endpoint difference in another firmware build.
+title: "[Firmware]: "
+labels: [firmware]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Firmware version and source revision
+      placeholder: VER_7.004 / commit SHA
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint
+      placeholder: /status
+    validations:
+      required: true
+  - type: textarea
+    id: difference
+    attributes:
+      label: Observed difference
+    validations:
+      required: true
+  - type: textarea
+    id: fixture
+    attributes:
+      label: Minimal redacted fixture
+      description: Replace credentials, query strings, addresses, MACs, SSIDs, callbacks, brokers, and device names.
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Redaction confirmation
+      options:
+        - label: This fixture contains no real credentials, network identifiers, device names, or private URLs.
+          required: true

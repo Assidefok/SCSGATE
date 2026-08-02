@@ -1,0 +1,8 @@
+* @Assidefok
+
+/custom_components/scsgate/api.py @Assidefok
+/custom_components/scsgate/config_flow.py @Assidefok
+/custom_components/scsgate/__init__.py @Assidefok
+/custom_components/scsgate/diagnostics.py @Assidefok
+/.github/workflows/ @Assidefok
+/SECURITY.md @Assidefok

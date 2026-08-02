@@ -1,0 +1,58 @@
+name: Bug report
+description: Report reproducible integration behavior using sanitized data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, URLs, IP/MAC addresses, SSIDs, callbacks, broker details, device names, or raw gateway pages.
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: 2026.8.0
+    validations:
+      required: true
+  - type: input
+    id: integration_version
+    attributes:
+      label: SCSGATE integration version
+      placeholder: 0.1.1
+    validations:
+      required: true
+  - type: input
+    id: firmware_version
+    attributes:
+      label: Gateway firmware version
+      placeholder: VER_7.004
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Paste only the smallest decisive excerpt after redaction.
+      render: text
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed credentials, query strings, addresses, identifiers, device names, callbacks, and broker/SSID details.
+          required: true
+        - label: I did not reproduce this with raw commands or destructive actions on a live gateway.
+          required: true
+        - label: This report is not a security vulnerability.
+          required: true

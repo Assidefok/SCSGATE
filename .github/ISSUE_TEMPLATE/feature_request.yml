@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a safe SCSGATE or Home Assistant improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: firmware
+    attributes:
+      label: Firmware endpoint or primary-source evidence
+      description: Link public source code/manual evidence. Do not attach a real gateway capture.
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk category
+      options:
+        - Read-only
+        - Device or MQTT configuration
+        - Credentials or callback
+        - Raw SCS command
+        - Reset, clear, or PIC programming
+    validations:
+      required: true
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Architecture confirmation
+      options:
+        - label: The proposal does not duplicate MQTT Discovery actuator entities.
+          required: true
+        - label: The proposal does not require a generic HTTP passthrough.
+          required: true
+        - label: No secrets or private network details are included.
+          required: true

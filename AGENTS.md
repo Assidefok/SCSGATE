@@ -10,9 +10,11 @@
 - Keep modules typed and independently testable. User-facing strings belong in translation files.
 - Tests must not contact a real gateway, broker, or Home Assistant instance.
 
-## File ownership during initial parallel implementation
+## Contribution requirements
 
-- Protocol agent: `custom_components/scsgate/api.py`, `models.py`, `parsers.py`, protocol fixtures/docs.
-- HA core agent: `__init__.py`, `const.py`, `coordinator.py`, entity platforms, `diagnostics.py`, `services.yaml`.
-- Admin agent: `config_flow.py`, `strings.json`, `translations/`.
-- Parent agent integrates shared contracts and resolves conflicts.
+- Add or update a redacted fixture and tests for every parser or firmware route.
+- Update `docs/http-api.md` when endpoint behavior or risk changes.
+- Update English, Catalan, and Spanish strings for every user-visible flow.
+- Run Ruff, compileall, pytest, Hassfest, and HACS validation before release.
+- Never commit real gateway captures, diagnostics, credentials, MAC/IP addresses,
+  SSIDs, callback URLs, broker details, or Home Assistant `.storage` data.

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/Assidefok/SCSGATE/security/advisories/new
+    about: Never publish vulnerabilities, credentials, or private network details in an issue.

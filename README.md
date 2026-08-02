@@ -1,5 +1,7 @@
 # SCSGATE
 
+![SCSGATE icon](brand/icon.png)
+
 Home Assistant custom integration for ESP32_SCSGATE firmware `VER_7.004`.
 It keeps the firmware's native MQTT Discovery entities and adds safe gateway
 setup, diagnostics, device census, and guarded HTTP administration.
@@ -53,8 +55,15 @@ firmware/manual versions used by this integration.
 python -m pip install --upgrade pip
 python -m pip install -r requirements_test.txt
 ruff check .
-pytest
+python -m pytest
 ```
+
+## Contributing
+
+Bug reports, firmware compatibility reports, feature requests, and pull
+requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and use the
+structured GitHub issue forms. Never attach unredacted gateway pages, URLs,
+credentials, diagnostics, MAC/IP addresses, or MQTT/Wi-Fi configuration.
 
 ## Credits
 
