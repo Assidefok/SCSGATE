@@ -11,25 +11,27 @@
       "status": {"title": "Estado del gateway", "data": {"refresh": "Actualizar ahora"}},
       "devices": {"menu_options": {"device_query": "Consultar tabla", "device_add": "Añadir dispositivo", "device_edit": "Editar dispositivo"}},
       "device_query": {"title": "Consultar dispositivos", "data": {"query": "Consultar ahora"}},
-      "device_add": {"title": "Añadir dispositivo", "data": {"busid": "ID bus SCS", "type": "Tipo", "devname": "Nombre", "maxpos": "Posición/tiempo máximo", "resend": "Republicar MQTT Discovery"}},
+      "device_add": {"title": "Añadir dispositivo", "description": "Usa la dirección hexadecimal de dos dígitos. Tipos: 1 interruptor/luz, 3 o 4 dimmer, 8 o 18 persiana, 9 o 19 persiana porcentual, 11 genérico, 14 alarma.", "data": {"busid": "ID bus SCS", "type": "Tipo", "devname": "Nombre", "maxpos": "Posición/tiempo máximo", "resend": "Republicar MQTT Discovery"}},
       "device_edit": {"title": "Editar dispositivo", "data": {"busid": "ID bus SCS", "type": "Tipo", "devname": "Nombre", "maxpos": "Posición/tiempo máximo", "resend": "Republicar MQTT Discovery"}},
-      "census": {"menu_options": {"census_prepare": "Preparar censo", "census_start": "Iniciar importación", "census_query": "Consultar progreso", "census_stop": "Detener censo", "census_resend": "Republicar Discovery"}},
+      "census": {"menu_options": {"census_prepare": "Iniciar censo guiado", "census_recovery_stop": "Detener un censo abandonado", "census_resend": "Republicar Discovery"}},
       "census_prepare": {"title": "Preparar censo", "data": {"confirm": "Lo entiendo"}},
       "census_start": {"title": "Iniciar importación", "data": {"confirm": "Iniciar"}},
       "census_query": {"title": "Consultar censo", "data": {"confirm": "Consultar"}},
+      "census_review": {"title": "Confirmar dispositivos detectados", "description": "El gateway informa de {count} dispositivos:\n\n{devices}\n\nAcéptalos, repite el escaneo o añade manualmente el dispositivo que falte.", "data": {"action": "Siguiente acción"}},
       "census_stop": {"title": "Detener censo", "data": {"confirm": "Detener"}},
+      "census_recovery_stop": {"title": "Detener censo abandonado", "description": "Usa esta recuperación si un censo anterior se cerró antes de terminar.", "data": {"confirm": "Detener ahora"}},
       "census_resend": {"title": "Republicar MQTT Discovery", "data": {"confirm": "Republicar"}},
       "mqtt": {"title": "Configurar MQTT", "description": "Las credenciales se envían una sola vez mediante HTTP GET sin cifrar y Home Assistant no las guarda.", "data": {"broker": "IP broker", "port": "Puerto", "username": "Usuario", "password": "Contraseña", "domain": "Modo", "discovery_options": "Opciones Discovery", "log": "Log MQTT", "persistent": "Mensajes retenidos", "alexa": "Modo Alexa"}},
       "network": {"title": "Configurar red", "data": {"ssid": "SSID", "password": "Contraseña Wi-Fi", "ip": "IP gateway", "gateway": "IP router", "udp_port": "Puerto UDP", "confirm_mac": "Identificador actual"}},
-      "callback": {"title": "Configurar callback HTTP", "data": {"callback": "URL privada o ruta firmware"}},
+      "callback": {"title": "Configurar callback HTTP", "description": "El callback persiste en la EEPROM y se envía sin TLS. Se rechazan consultas y fragmentos. Escribe CALLBACK seguido del identificador del gateway.", "data": {"callback": "URL privada o ruta firmware", "confirm_mac": "CALLBACK identificador gateway"}},
       "maintenance": {"menu_options": {"reset_mqtt": "Reconectar MQTT", "reset_advanced": "Reiniciar procesador", "picprog_test": "Probar programación PIC", "picprog_flash": "Programar firmware PIC"}},
       "reset_mqtt": {"title": "Reconectar MQTT", "data": {"confirm": "Reconectar"}},
       "reset_advanced": {"title": "Reiniciar procesador", "data": {"device": "Objetivo", "confirm_mac": "Identificador actual"}},
       "picprog_test": {"title": "Probar programación PIC", "data": {"confirm": "Ejecutar prueba"}},
       "picprog_flash": {"title": "Programar firmware PIC", "data": {"confirm": "FLASH identificador"}},
       "danger": {"title": "Borrar dispositivos aprendidos", "data": {"confirm": "CLEAR identificador"}},
-      "advanced": {"title": "Opciones avanzadas", "description": "El debug de protocolo analiza en memoria todas las respuestas HTTP y solo conserva contadores estructurales y códigos de anomalía fijos. Nunca guarda ni registra el contenido sin procesar.", "data": {"enable_raw_commands": "Activar servicio SCS crudo", "enable_protocol_debug": "Activar análisis seguro del protocolo", "scan_interval": "Intervalo de estado (segundos)"}}
+      "advanced": {"title": "Opciones avanzadas", "description": "El monitor de todo el broker conserva un registro MQTT limitado y volátil. Puede revelar direcciones y ocupación. El firmware 7.004 estándar publica scs/...; el UART crudo SCSLOG requiere firmware compilado con MQTTLOG.", "data": {"enable_raw_commands": "Activar servicio SCS crudo", "enable_protocol_debug": "Activar análisis HTTP seguro", "scan_interval": "Intervalo de estado (segundos)", "enable_bus_monitor": "Activar monitor de todo el broker", "bus_monitor_limit": "Mensajes retenidos en memoria"}}
     },
-    "error": {"cannot_connect": "No se puede conectar con el gateway.", "confirmation_required": "La confirmación no coincide.", "invalid_callback": "Callback privado no válido."}
+    "error": {"cannot_connect": "No se puede conectar con el gateway.", "confirmation_required": "La confirmación no coincide.", "invalid_callback": "Callback privado no válido.", "census_still_running": "La importación del PIC agotó el tiempo y se detuvo de forma segura. Inicia de nuevo el censo guiado.", "census_recovery_required": "Un censo anterior puede seguir activo. Detén el censo abandonado antes de iniciar otro."}
   }
 }

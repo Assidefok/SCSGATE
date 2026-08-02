@@ -75,6 +75,26 @@ shapes. It retains only the latest 25 secret-free observations in memory and
 exports them through diagnostics; raw response content and values are discarded
 immediately. Disable it after reproducing the problem.
 
+### Bus activity viewer and guided device learning
+
+Enable **Bus activity monitor** in **Configure > Advanced** to keep a bounded,
+volatile capture of `scs/#`, `SCSERROR`, and, when supported by the firmware,
+`SCSLOG`. The **Bus monitor** sensor shows safe counters. To view the captured
+messages, run `scsgate.export_bus_log` from Developer Tools > Actions with the
+entry ID and `confirm: true`; use `scsgate.clear_bus_log` when finished.
+
+Message contents never enter entity state, normal diagnostics, or Home
+Assistant's persistent log. The capture covers the broker-wide `scs` namespace,
+so it cannot attribute messages to one gateway when several gateways share the
+same broker. Stock firmware 7.004 compiles its raw
+UART `SCSLOG` publisher out; on that build the viewer shows interpreted MQTT
+activity, not every electrical bus telegram.
+
+The guided census now waits for the PIC import, parses the firmware's real HTML
+device table, displays every learned address and type, and asks you to accept,
+scan again, or add a missing device manually. This is especially useful for
+lights and dimmers that were not inferred during the physical activation step.
+
 ## Development
 
 ```bash

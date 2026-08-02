@@ -101,6 +101,45 @@ async def test_device_management_rejects_undocumented_requests(
     assert session.calls == []
 
 
+@pytest.mark.parametrize(
+    ("body", "complete", "device_count"),
+    [
+        ('{"status":"waiting query 0x24"}', False, 0),
+        (
+            "OK - list of discovered devices:<ol><li>24switch Kitchen</li>"
+            "<li>34dimmer Dining</li></ol>",
+            True,
+            2,
+        ),
+    ],
+)
+async def test_device_query_reports_firmware_import_progress(
+    body: str,
+    complete: bool,
+    device_count: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession(FakeResponse(body=body))
+    gateway = GatewayClient(session, "192.168.1.20")  # type: ignore[arg-type]
+    monkeypatch.setattr(gateway, "async_validate_host", _bypass_host_validation)
+
+    finished, devices = await gateway.async_query_devices_with_state()
+
+    assert finished is complete
+    assert len(devices) == device_count
+
+
+async def test_device_query_rejects_unrecognized_success_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = FakeSession(FakeResponse(body="<html>unexpected page</html>"))
+    gateway = GatewayClient(session, "192.168.1.20")  # type: ignore[arg-type]
+    monkeypatch.setattr(gateway, "async_validate_host", _bypass_host_validation)
+
+    with pytest.raises(GatewayResponseError, match="Unexpected response"):
+        await gateway.async_query_devices_with_state()
+
+
 async def test_mqtt_password_not_leaked_by_transport_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -327,7 +366,17 @@ async def test_network_configuration_uses_exact_firmware_parameters(
 
 
 @pytest.mark.parametrize(
-    "callback", ["http://8.8.8.8/hook", "http://user@192.168.1.2/hook"]
+    "callback",
+    [
+        "http://8.8.8.8/hook",
+        "http://user@192.168.1.2/hook",
+        "http://127.0.0.1/hook",
+        "http://169.254.1.2/hook",
+        "http://192.168.1.2/hook?token=secret",
+        "/hook?token=secret",
+        "/hook/../admin",
+        ":80//hook",
+    ],
 )
 async def test_callback_rejects_public_or_credentialed_urls(
     client: tuple[GatewayClient, FakeSession], callback: str
@@ -336,5 +385,16 @@ async def test_callback_rejects_public_or_credentialed_urls(
 
     with pytest.raises(GatewayValidationError, match=r"Callback|callback"):
         await gateway.async_set_callback(callback)
+
+    assert session.calls == []
+
+
+async def test_callback_caps_value_to_firmware_eeprom_capacity(
+    client: tuple[GatewayClient, FakeSession],
+) -> None:
+    gateway, session = client
+
+    with pytest.raises(GatewayValidationError, match=r"Callback|callback"):
+        await gateway.async_set_callback(":80/" + "a" * 94)
 
     assert session.calls == []

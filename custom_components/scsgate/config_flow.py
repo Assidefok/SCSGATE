@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import logging
 from collections.abc import Awaitable, Mapping
@@ -16,8 +17,21 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import GatewayClient, GatewayConnectionError, GatewayValidationError
-from .const import CONF_LAST_CENSUS, CONF_PROTOCOL_DEBUG, DOMAIN
+from .api import (
+    GatewayClient,
+    GatewayConnectionError,
+    GatewayResponseError,
+    GatewayValidationError,
+)
+from .const import (
+    CONF_BUS_MONITOR,
+    CONF_BUS_MONITOR_LIMIT,
+    CONF_LAST_CENSUS,
+    CONF_PROTOCOL_DEBUG,
+    DEFAULT_BUS_MONITOR_LIMIT,
+    DOMAIN,
+    MAX_CALLBACK_LENGTH,
+)
 
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ENABLE_RAW = "enable_raw_commands"
@@ -104,15 +118,17 @@ class ScsGateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> ScsGateOptionsFlow:
-        return ScsGateOptionsFlow(config_entry)
+        return ScsGateOptionsFlow()
 
 
 class ScsGateOptionsFlow(config_entries.OptionsFlow):
     """Deliberately narrow admin UI; no generic HTTP request escape hatch."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+    def __init__(self) -> None:
         self._pending: dict[str, Any] = {}
+        self._census_devices: list[Any] = []
+        self._census_active = False
+        self._census_cleanup_task: asyncio.Task[None] | None = None
 
     @property
     def _client(self) -> GatewayClient:
@@ -175,9 +191,16 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             )
         ).upper()
 
-    def _finish(self) -> FlowResult:
+    def _finish(self, extra_options: Mapping[str, Any] | None = None) -> FlowResult:
         """Finish an action without discarding previously selected options."""
-        return self.async_create_entry(title="", data=dict(self.config_entry.options))
+        return self.async_create_entry(
+            title="",
+            data={
+                **self.config_entry.options,
+                **self._pending.get("options", {}),
+                **(extra_options or {}),
+            },
+        )
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -205,7 +228,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             try:
                 await self._status()
                 return self._finish()
-            except GatewayConnectionError:
+            except (GatewayConnectionError, GatewayResponseError):
                 errors["base"] = "cannot_connect"
         return self.async_show_form(
             step_id="status",
@@ -242,7 +265,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
     def _device_schema(self) -> vol.Schema:
         return vol.Schema(
             {
-                vol.Required("busid"): vol.All(str, vol.Length(min=1, max=32)),
+                vol.Required("busid"): vol.All(str, vol.Match(r"^[0-9A-Fa-f]{2}$")),
                 vol.Required("type"): vol.All(vol.Coerce(int), vol.In(DEVICE_TYPES)),
                 vol.Required("devname"): vol.All(str, vol.Length(min=1, max=64)),
                 vol.Optional("maxpos", default=100): vol.All(
@@ -295,9 +318,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             step_id="census",
             menu_options=[
                 "census_prepare",
-                "census_start",
-                "census_query",
-                "census_stop",
+                "census_recovery_stop",
                 "census_resend",
             ],
         )
@@ -320,7 +341,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     category, request.removeprefix("__"), operation
                 )
                 return self._finish()
-            except GatewayConnectionError:
+            except (GatewayConnectionError, GatewayResponseError):
                 return self.async_show_form(
                     step_id=step_id,
                     data_schema=vol.Schema({}),
@@ -337,13 +358,15 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
+            if self._census_active:
+                return self._census_recovery_error("census_recovery_required")
             try:
                 await self._run_operation(
                     "census",
                     "prepare",
                     self._client.async_mqtt_devices("prepare"),
                 )
-            except GatewayConnectionError:
+            except (GatewayConnectionError, GatewayResponseError):
                 return self.async_show_form(
                     step_id="census_prepare",
                     data_schema=vol.Schema(
@@ -351,6 +374,8 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     ),
                     errors={"base": "cannot_connect"},
                 )
+            self._census_active = True
+            self._schedule_census_cleanup()
             return await self.async_step_census_start()
         return self.async_show_form(
             step_id="census_prepare",
@@ -363,10 +388,23 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            await self._run_operation(
-                "census", "start", self._client.async_mqtt_devices("start")
-            )
-            return await self.async_step_census_query()
+            if not self._census_active:
+                return await self.async_step_census_prepare()
+            try:
+                await self._run_operation(
+                    "census", "start", self._client.async_mqtt_devices("start")
+                )
+                return await self._poll_census()
+            except (GatewayConnectionError, GatewayResponseError):
+                if not await self._stop_census_best_effort():
+                    return self._census_recovery_error()
+                return self.async_show_form(
+                    step_id="census_prepare",
+                    data_schema=vol.Schema(
+                        {vol.Required("confirm", default=False): vol.In([True])}
+                    ),
+                    errors={"base": "cannot_connect"},
+                )
         return self.async_show_form(
             step_id="census_start",
             data_schema=vol.Schema(
@@ -378,10 +416,9 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            await self._run_operation(
-                "census", "query", self._client.async_query_devices()
-            )
-            return await self.async_step_census_stop()
+            if not self._census_active:
+                return await self.async_step_census_prepare()
+            return await self._poll_census()
         return self.async_show_form(
             step_id="census_query",
             data_schema=vol.Schema(
@@ -389,26 +426,152 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             ),
         )
 
+    async def _poll_census(self) -> FlowResult:
+        """Poll the firmware's asynchronous PIC-table import without blocking HA."""
+        try:
+            for _ in range(10):
+                complete, devices = await self._client.async_query_devices_with_state()
+                if complete:
+                    self._census_devices = devices
+                    return await self.async_step_census_review()
+                await asyncio.sleep(0.25)
+        except (GatewayConnectionError, GatewayResponseError, GatewayValidationError):
+            if not await self._stop_census_best_effort():
+                return self._census_recovery_error()
+            return self.async_show_form(
+                step_id="census_prepare",
+                data_schema=vol.Schema(
+                    {vol.Required("confirm", default=False): vol.In([True])}
+                ),
+                errors={"base": "cannot_connect"},
+            )
+        if not await self._stop_census_best_effort():
+            return self._census_recovery_error()
+        return self.async_show_form(
+            step_id="census_prepare",
+            data_schema=vol.Schema(
+                {vol.Required("confirm", default=False): vol.In([True])}
+            ),
+            errors={"base": "census_still_running"},
+        )
+
+    def _schedule_census_cleanup(self) -> None:
+        """Ensure abandoned browser flows eventually restore firmware state."""
+        if self._census_cleanup_task is not None:
+            self._census_cleanup_task.cancel()
+        self._census_cleanup_task = self.hass.async_create_task(
+            self._async_census_timeout_cleanup(), "SCSGATE census timeout cleanup"
+        )
+
+    async def _async_census_timeout_cleanup(self) -> None:
+        await asyncio.sleep(600)
+        await self._stop_census_best_effort()
+
+    async def _stop_census_best_effort(self) -> bool:
+        """Stop PIC learning without leaking submitted values or masking errors."""
+        stopped = True
+        if self._census_active:
+            try:
+                await self._client.async_mqtt_devices("stop")
+            except Exception as err:
+                stopped = False
+                _LOGGER.debug("Census cleanup failed error_type=%s", type(err).__name__)
+        if stopped:
+            self._census_active = False
+        task = self._census_cleanup_task
+        self._census_cleanup_task = None
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+        return stopped
+
+    def _census_recovery_error(self, error: str = "cannot_connect") -> FlowResult:
+        return self.async_show_form(
+            step_id="census_recovery_stop",
+            data_schema=vol.Schema(
+                {vol.Required("confirm", default=True): vol.In([True])}
+            ),
+            errors={"base": error},
+        )
+
+    async def async_step_census_review(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show exactly what the firmware learned before accepting the census."""
+        if user_input is not None:
+            action = user_input["action"]
+            if action == "scan_again":
+                if not await self._stop_census_best_effort():
+                    return self._census_recovery_error()
+                return await self.async_step_census_prepare()
+            if action == "add_manual":
+                if not await self._stop_census_best_effort():
+                    return self._census_recovery_error()
+                return await self.async_step_device_add()
+            return await self.async_step_census_stop({"confirm": True})
+        device_lines = "\n".join(
+            f"- {device.bus_id}: type {device.type or '?'}"
+            + (
+                " - "
+                + "".join(char for char in str(device.name) if char.isprintable())[:64]
+                if device.name
+                else ""
+            )
+            for device in self._census_devices
+        )
+        if not device_lines:
+            device_lines = "No devices detected"
+        return self.async_show_form(
+            step_id="census_review",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action", default="accept"): vol.In(
+                        ["accept", "scan_again", "add_manual"]
+                    )
+                }
+            ),
+            description_placeholders={
+                "count": str(len(self._census_devices)),
+                "devices": device_lines,
+            },
+        )
+
     async def async_step_census_stop(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            await self._run_operation(
-                "census", "stop", self._client.async_mqtt_devices("stop")
+            try:
+                await self._run_operation(
+                    "census", "stop", self._client.async_mqtt_devices("stop")
+                )
+                self._census_active = False
+                await self._run_operation(
+                    "census", "resend", self._client.async_mqtt_devices("resend")
+                )
+            except (GatewayConnectionError, GatewayResponseError):
+                await self._stop_census_best_effort()
+                return self._census_recovery_error()
+            await self._stop_census_best_effort()
+            return self._finish(
+                {CONF_LAST_CENSUS: datetime.now(UTC).isoformat(timespec="seconds")}
             )
-            await self._run_operation(
-                "census", "resend", self._client.async_mqtt_devices("resend")
-            )
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                options={
-                    **self.config_entry.options,
-                    CONF_LAST_CENSUS: datetime.now(UTC).isoformat(timespec="seconds"),
-                },
-            )
-            return self._finish()
         return self.async_show_form(
             step_id="census_stop",
+            data_schema=vol.Schema(
+                {vol.Required("confirm", default=False): vol.In([True])}
+            ),
+        )
+
+    async def async_step_census_recovery_stop(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Stop a census abandoned in another browser flow."""
+        if user_input is not None:
+            self._census_active = True
+            if not await self._stop_census_best_effort():
+                return self._census_recovery_error()
+            return self._finish()
+        return self.async_show_form(
+            step_id="census_recovery_stop",
             data_schema=vol.Schema(
                 {vol.Required("confirm", default=False): vol.In([True])}
             ),
@@ -508,10 +671,24 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         if user_input is not None:
             callback_url = user_input["callback"].strip()
-            if len(callback_url) > 200:
+            try:
+                identifier = self._identifier(await self._status())
+            except (GatewayConnectionError, GatewayResponseError):
                 return self.async_show_form(
                     step_id="callback",
-                    data_schema=vol.Schema({vol.Required("callback"): str}),
+                    data_schema=self._callback_schema(),
+                    errors={"base": "cannot_connect"},
+                )
+            if user_input["confirm_mac"].upper() != f"CALLBACK {identifier}":
+                return self.async_show_form(
+                    step_id="callback",
+                    data_schema=self._callback_schema(),
+                    errors={"confirm_mac": "confirmation_required"},
+                )
+            if len(callback_url) > MAX_CALLBACK_LENGTH:
+                return self.async_show_form(
+                    step_id="callback",
+                    data_schema=self._callback_schema(),
                     errors={"callback": "invalid_callback"},
                 )
             try:
@@ -519,12 +696,26 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             except GatewayValidationError:
                 return self.async_show_form(
                     step_id="callback",
-                    data_schema=vol.Schema({vol.Required("callback"): str}),
+                    data_schema=self._callback_schema(),
                     errors={"callback": "invalid_callback"},
+                )
+            except (GatewayConnectionError, GatewayResponseError):
+                return self.async_show_form(
+                    step_id="callback",
+                    data_schema=self._callback_schema(),
+                    errors={"base": "cannot_connect"},
                 )
             return self._finish()
         return self.async_show_form(
-            step_id="callback", data_schema=vol.Schema({vol.Required("callback"): str})
+            step_id="callback", data_schema=self._callback_schema()
+        )
+
+    def _callback_schema(self) -> vol.Schema:
+        return vol.Schema(
+            {
+                vol.Required("callback"): str,
+                vol.Required("confirm_mac"): str,
+            }
         )
 
     async def async_step_maintenance(
@@ -609,15 +800,11 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     errors={"confirm": "confirmation_required"},
                 )
             devices = await self._client.async_query_devices()
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                options={
-                    **self.config_entry.options,
-                    CONF_LAST_SNAPSHOT: str(devices)[:4096],
-                },
-            )
+            self._pending["options"] = {CONF_LAST_SNAPSHOT: str(devices)[:4096]}
             await self._client.async_mqtt_devices("clear")
             await self._client.async_mqtt_devices("prepare")
+            self._census_active = True
+            self._schedule_census_cleanup()
             return await self.async_step_census_start()
         return self.async_show_form(
             step_id="danger", data_schema=vol.Schema({vol.Required("confirm"): str})
@@ -633,6 +820,8 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     **self.config_entry.options,
                     CONF_ENABLE_RAW: user_input[CONF_ENABLE_RAW],
                     CONF_PROTOCOL_DEBUG: user_input[CONF_PROTOCOL_DEBUG],
+                    CONF_BUS_MONITOR: user_input[CONF_BUS_MONITOR],
+                    CONF_BUS_MONITOR_LIMIT: user_input[CONF_BUS_MONITOR_LIMIT],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 },
             )
@@ -656,6 +845,16 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=30, max=3600)),
+                    vol.Required(
+                        CONF_BUS_MONITOR,
+                        default=self.config_entry.options.get(CONF_BUS_MONITOR, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_BUS_MONITOR_LIMIT,
+                        default=self.config_entry.options.get(
+                            CONF_BUS_MONITOR_LIMIT, DEFAULT_BUS_MONITOR_LIMIT
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=10, max=500)),
                 }
             ),
         )

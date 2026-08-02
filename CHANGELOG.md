@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- Add an opt-in, bounded MQTT bus activity monitor for `scs/#`, `SCSERROR`,
+  and optional custom-firmware `SCSLOG` traffic.
+- Add confirmed on-demand structured log export and volatile-log clearing.
+- Show safe capture counters without storing bus messages in entity history or
+  ordinary diagnostics.
+- Make the guided census poll the asynchronous PIC import, parse the real 7.004
+  device-list HTML, and ask users to accept, rescan, or add missing devices.
+- Cap callbacks at the firmware EEPROM-safe maximum of 97 characters.
+
 ## 0.1.3
 
 - Add secret-free operation IDs, HTTP timing/status metrics, parser counts,

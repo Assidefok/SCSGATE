@@ -29,6 +29,20 @@ def test_parse_device_records() -> None:
     ]
 
 
+def test_parse_real_7004_device_list_fixture() -> None:
+    devices = parse_devices(
+        (FIXTURES / "devices_7004_real.html").read_text(encoding="utf-8")
+    )
+
+    assert [(item.bus_id, item.type) for item in devices] == [
+        ("24", 1),
+        ("34", 3),
+        ("41", 8),
+        ("42", 19),
+        ("43", 11),
+    ]
+
+
 def test_parser_debug_logs_counts_without_payload(
     caplog,
 ) -> None:

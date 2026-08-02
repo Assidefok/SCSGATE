@@ -88,3 +88,32 @@ device names, network identifiers, or credentials. Only the most recent 25
 observations remain in memory, and they are cleared on integration reload or
 Home Assistant restart. Download diagnostics after reproducing the fault, then
 turn the option off.
+
+### Bus activity monitor
+
+The optional bus monitor subscribes passively to the broker-wide documented
+MQTT namespace. It cannot attribute a message to a specific gateway when more
+than one gateway shares the same broker. It keeps 10–500 recent messages in memory and clears them on
+reload or restart. Use the **Bus monitor** diagnostic sensor for counts and
+`scsgate.export_bus_log` with `confirm: true` to inspect the actual messages.
+The response is intended for Developer Tools > Actions and can be copied into a
+temporary support file. Do not call the export from an automation or forward
+its response to notifications. Clear it with `scsgate.clear_bus_log` after use;
+aggregate lifetime counters intentionally remain until reload.
+
+The official 7.004 source has `MQTTLOG` commented out. Consequently, ordinary
+firmware exposes interpreted `scs/...` states and `SCSERROR`, while raw UART
+RX/TX on `SCSLOG` is available only in a firmware build that enables that
+compile-time feature. The integration detects `SCSLOG` automatically if it
+appears; it never enables a TCP debug channel or consumes the PIC's small RX
+buffer.
+
+### Guided device learning
+
+Choose **Configure > Guided census > Prepare census**, then physically operate
+each required SCS device. Starting the import transfers the PIC's learned table
+to the ESP. SCSGATE polls without blocking Home Assistant, then shows the exact
+addresses and inferred types. Accept the list, repeat the scan, or choose the
+manual-add path for a missing light, dimmer, cover, generic device, or alarm.
+If the browser flow is abandoned, a best-effort cleanup stops PIC learning
+after ten minutes; **Stop an abandoned census** is also available immediately.
