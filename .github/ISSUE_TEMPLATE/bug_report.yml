@@ -17,7 +17,7 @@ body:
     id: integration_version
     attributes:
       label: SCSGATE integration version
-      placeholder: 0.1.1
+      placeholder: 0.1.3
     validations:
       required: true
   - type: input
@@ -45,6 +45,11 @@ body:
       label: Sanitized logs
       description: Paste only the smallest decisive excerpt after redaction.
       render: text
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Relevant diagnostic summary
+      description: Summarize only the redacted transport counters and operation ID; do not paste raw gateway pages.
   - type: checkboxes
     id: safety
     attributes:

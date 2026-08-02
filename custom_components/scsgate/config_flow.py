@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import ipaddress
-from collections.abc import Mapping
+import logging
+from collections.abc import Awaitable, Mapping
 from datetime import UTC, datetime
+from itertools import count
 from typing import Any
 
 import voluptuous as vol
@@ -15,7 +17,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import GatewayClient, GatewayConnectionError, GatewayValidationError
-from .const import CONF_LAST_CENSUS, DOMAIN
+from .const import CONF_LAST_CENSUS, CONF_PROTOCOL_DEBUG, DOMAIN
 
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ENABLE_RAW = "enable_raw_commands"
@@ -23,6 +25,8 @@ CONF_LAST_SNAPSHOT = "last_device_snapshot"
 DEFAULT_PORT = 80
 DEFAULT_SCAN_INTERVAL = 300
 DEVICE_TYPES = {1, 3, 4, 8, 9, 11, 14, 18, 19}
+_LOGGER = logging.getLogger(__name__)
+_ADMIN_OPERATION_COUNTER = count(1)
 
 
 def _field(value: Any, name: str, default: Any = None) -> Any:
@@ -112,14 +116,53 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
 
     @property
     def _client(self) -> GatewayClient:
+        runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        runtime_client = getattr(runtime, "client", None)
+        if isinstance(runtime_client, GatewayClient):
+            return runtime_client
         return GatewayClient(
             async_get_clientsession(self.hass),
             self.config_entry.data[CONF_HOST],
             self.config_entry.data[CONF_PORT],
+            protocol_debug=self.config_entry.options.get(CONF_PROTOCOL_DEBUG, False),
         )
 
     async def _status(self) -> Any:
         return await self._client.async_get_status()
+
+    async def _run_operation(
+        self, category: str, action: str, operation: Awaitable[Any]
+    ) -> Any:
+        """Track an admin operation without logging its submitted values."""
+        operation_id = f"admin-{next(_ADMIN_OPERATION_COUNTER):06d}"
+        _LOGGER.debug(
+            "Gateway admin operation started operation_id=%s category=%s action=%s",
+            operation_id,
+            category,
+            action,
+        )
+        try:
+            result = await operation
+        except Exception as err:
+            _LOGGER.debug(
+                "Gateway admin operation failed operation_id=%s category=%s "
+                "action=%s error_type=%s",
+                operation_id,
+                category,
+                action,
+                type(err).__name__,
+            )
+            raise
+        result_count = len(result) if isinstance(result, list) else None
+        _LOGGER.debug(
+            "Gateway admin operation completed operation_id=%s category=%s "
+            "action=%s result_count=%s",
+            operation_id,
+            category,
+            action,
+            result_count,
+        )
+        return result
 
     def _identifier(self, status: Any) -> str:
         """Return the stable confirmation identifier exposed to the user."""
@@ -265,13 +308,17 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             try:
                 if request == "query":
-                    await self._client.async_query_devices()
+                    operation = self._client.async_query_devices()
                 elif request == "__reset_mqtt":
-                    await self._client.async_reset("mqtt")
+                    operation = self._client.async_reset("mqtt")
                 elif request == "__picprog_test":
-                    await self._client.async_pic_program("T")
+                    operation = self._client.async_pic_program("T")
                 else:
-                    await self._client.async_mqtt_devices(request)
+                    operation = self._client.async_mqtt_devices(request)
+                category = "census" if not request.startswith("__") else "maintenance"
+                await self._run_operation(
+                    category, request.removeprefix("__"), operation
+                )
                 return self._finish()
             except GatewayConnectionError:
                 return self.async_show_form(
@@ -291,7 +338,11 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         if user_input is not None:
             try:
-                await self._client.async_mqtt_devices("prepare")
+                await self._run_operation(
+                    "census",
+                    "prepare",
+                    self._client.async_mqtt_devices("prepare"),
+                )
             except GatewayConnectionError:
                 return self.async_show_form(
                     step_id="census_prepare",
@@ -312,7 +363,9 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            await self._client.async_mqtt_devices("start")
+            await self._run_operation(
+                "census", "start", self._client.async_mqtt_devices("start")
+            )
             return await self.async_step_census_query()
         return self.async_show_form(
             step_id="census_start",
@@ -325,7 +378,9 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            await self._client.async_query_devices()
+            await self._run_operation(
+                "census", "query", self._client.async_query_devices()
+            )
             return await self.async_step_census_stop()
         return self.async_show_form(
             step_id="census_query",
@@ -338,8 +393,12 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            await self._client.async_mqtt_devices("stop")
-            await self._client.async_mqtt_devices("resend")
+            await self._run_operation(
+                "census", "stop", self._client.async_mqtt_devices("stop")
+            )
+            await self._run_operation(
+                "census", "resend", self._client.async_mqtt_devices("resend")
+            )
             self.hass.config_entries.async_update_entry(
                 self.config_entry,
                 options={
@@ -573,6 +632,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                 data={
                     **self.config_entry.options,
                     CONF_ENABLE_RAW: user_input[CONF_ENABLE_RAW],
+                    CONF_PROTOCOL_DEBUG: user_input[CONF_PROTOCOL_DEBUG],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 },
             )
@@ -583,6 +643,12 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     vol.Required(
                         CONF_ENABLE_RAW,
                         default=self.config_entry.options.get(CONF_ENABLE_RAW, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_PROTOCOL_DEBUG,
+                        default=self.config_entry.options.get(
+                            CONF_PROTOCOL_DEBUG, False
+                        ),
                     ): bool,
                     vol.Required(
                         CONF_SCAN_INTERVAL,

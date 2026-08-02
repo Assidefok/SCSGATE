@@ -28,7 +28,7 @@
       "picprog_test": {"title": "Prova programació PIC", "data": {"confirm": "Executa prova"}},
       "picprog_flash": {"title": "Programa firmware PIC", "data": {"confirm": "FLASH identificador"}},
       "danger": {"title": "Esborra dispositius apresos", "data": {"confirm": "CLEAR identificador"}},
-      "advanced": {"title": "Opcions avançades", "data": {"enable_raw_commands": "Activa servei SCS cru", "scan_interval": "Interval d'estat (segons)"}}
+      "advanced": {"title": "Opcions avançades", "description": "El debug de protocol analitza en memòria totes les respostes HTTP i només conserva comptadors estructurals i codis d'anomalia fixos. Mai no desa ni registra el contingut cru.", "data": {"enable_raw_commands": "Activa servei SCS cru", "enable_protocol_debug": "Activa l'anàlisi segura del protocol", "scan_interval": "Interval d'estat (segons)"}}
     },
     "error": {"cannot_connect": "No es pot connectar amb el gateway.", "confirmation_required": "La confirmació no coincideix.", "invalid_callback": "Callback privat invàlid."}
   }

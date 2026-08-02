@@ -1,5 +1,6 @@
 """Protocol parser tests require no gateway or broker."""
 
+import logging
 from pathlib import Path
 
 from custom_components.scsgate.parsers import parse_devices, parse_status
@@ -26,3 +27,20 @@ def test_parse_device_records() -> None:
         ("24", 9, 100),
         ("41", 8, 255),
     ]
+
+
+def test_parser_debug_logs_counts_without_payload(
+    caplog,
+) -> None:
+    private_name = "Unique private room"
+    caplog.set_level(logging.DEBUG, logger="custom_components.scsgate.parsers")
+
+    devices = parse_devices(
+        f"busid=24,type=9,devname={private_name},maxpos=100|unparsed secret row"
+    )
+
+    assert len(devices) == 1
+    assert "devices=1" in caplog.text
+    assert "ignored_records=1" in caplog.text
+    assert private_name not in caplog.text
+    assert "unparsed secret row" not in caplog.text

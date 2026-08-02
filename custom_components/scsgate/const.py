@@ -11,6 +11,7 @@ CONF_HOST: Final = "host"
 CONF_PORT: Final = "port"
 CONF_SCAN_INTERVAL: Final = "scan_interval"
 CONF_ENABLE_RAW_COMMANDS: Final = "enable_raw_commands"
+CONF_PROTOCOL_DEBUG: Final = "enable_protocol_debug"
 CONF_LAST_CENSUS: Final = "last_census"
 
 DEFAULT_PORT: Final = 80

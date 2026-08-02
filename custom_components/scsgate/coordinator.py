@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from dataclasses import replace
 from datetime import timedelta
+from time import monotonic
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -15,6 +17,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import CONF_LAST_CENSUS, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .models import GatewayStatus
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -34,7 +38,7 @@ class ScsGateCoordinator(DataUpdateCoordinator[Any]):
         interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         super().__init__(
             hass,
-            logger=__import__("logging").getLogger(__name__),
+            logger=_LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=interval),
         )
@@ -44,6 +48,8 @@ class ScsGateCoordinator(DataUpdateCoordinator[Any]):
 
     async def _async_update_data(self) -> Any:
         """Read status through the protocol client's stable public method."""
+        started = monotonic()
+        _LOGGER.debug("Coordinator refresh started")
         try:
             method = getattr(self.client, "async_get_status", None)
             if method is None:
@@ -51,13 +57,28 @@ class ScsGateCoordinator(DataUpdateCoordinator[Any]):
             status = await _maybe_await(method())
             last_census = self.config_entry.options.get(CONF_LAST_CENSUS)
             if last_census and isinstance(status, GatewayStatus):
-                return replace(status, last_census=last_census)
+                status = replace(status, last_census=last_census)
+            _LOGGER.debug(
+                "Coordinator refresh completed duration_ms=%s status_available=%s",
+                max(0, round((monotonic() - started) * 1000)),
+                status is not None,
+            )
             return status
         except (HomeAssistantError, OSError, TimeoutError) as err:
+            _LOGGER.debug(
+                "Coordinator refresh failed duration_ms=%s error_type=%s",
+                max(0, round((monotonic() - started) * 1000)),
+                type(err).__name__,
+            )
             raise UpdateFailed("Unable to reach SCSGATE") from err
         except (
             Exception
         ) as err:  # API parser/transport implementations are isolated here.
+            _LOGGER.debug(
+                "Coordinator refresh rejected duration_ms=%s error_type=%s",
+                max(0, round((monotonic() - started) * 1000)),
+                type(err).__name__,
+            )
             raise UpdateFailed("Unable to update SCSGATE status") from err
 
     @property

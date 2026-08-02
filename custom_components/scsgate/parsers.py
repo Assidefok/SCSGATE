@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import re
 from typing import Final
 
@@ -12,6 +13,7 @@ _TAG_RE: Final = re.compile(r"<[^>]+>")
 _SPACE_RE: Final = re.compile(r"[ \t\r\f\v]+")
 _MAC_RE: Final = re.compile(r"\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b", re.I)
 _INT_RE: Final = re.compile(r"-?\d+")
+_LOGGER = logging.getLogger(__name__)
 
 
 def _plain(value: str) -> str:
@@ -73,7 +75,7 @@ def parse_status(body: str, host: str) -> GatewayStatus:
     known_ids = (
         re.findall(r"\b[0-9A-Fa-f]{2,4}\b", known_match.group(1)) if known_match else []
     )
-    return GatewayStatus(
+    status = GatewayStatus(
         host=host,
         mac=mac_match.group().replace("-", ":").upper()
         if mac_match
@@ -98,6 +100,26 @@ def parse_status(body: str, host: str) -> GatewayStatus:
         if known_match
         else _int_after(text, "devices", "device count"),
     )
+    fields_present = tuple(
+        field
+        for field, value in (
+            ("mac", status.mac),
+            ("firmware_esp", status.firmware_esp),
+            ("firmware_pic", status.firmware_pic),
+            ("wifi", status.wifi_ssid),
+            ("rssi", status.rssi),
+            ("mqtt", status.mqtt_connected),
+            ("broker", status.mqtt_broker),
+            ("device_count", status.device_count),
+        )
+        if value is not None
+    )
+    _LOGGER.debug(
+        "Parsed gateway status fields=%s known_devices=%s",
+        ",".join(fields_present),
+        status.device_count,
+    )
+    return status
 
 
 def parse_devices(body: str) -> list[GatewayDevice]:
@@ -109,6 +131,7 @@ def parse_devices(body: str) -> list[GatewayDevice]:
     text = _plain(body)
     devices: list[GatewayDevice] = []
     records = re.split(r"(?:\r?\n|\|)+", text)
+    ignored_records = 0
     for record in records:
         pairs = {
             key.lower(): value.strip()
@@ -120,6 +143,8 @@ def parse_devices(body: str) -> list[GatewayDevice]:
         }
         bus_id = pairs.get("busid") or pairs.get("bus_id") or pairs.get("id")
         if not bus_id:
+            if record.strip():
+                ignored_records += 1
             continue
         type_value = pairs.get("type")
         maxpos_value = pairs.get("maxpos")
@@ -135,4 +160,9 @@ def parse_devices(body: str) -> list[GatewayDevice]:
                 else None,
             )
         )
+    _LOGGER.debug(
+        "Parsed gateway devices devices=%s ignored_records=%s",
+        len(devices),
+        ignored_records,
+    )
     return devices
