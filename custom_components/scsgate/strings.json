@@ -1,0 +1,50 @@
+{
+  "title": "SCSGATE",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect SCSGATE",
+        "description": "Enter the gateway's private/local IP address.",
+        "data": {"host": "IP address", "port": "HTTP port"}
+      }
+    },
+    "error": {
+      "private_host_required": "Use a private or local literal IP address.",
+      "cannot_connect": "Cannot connect to the gateway.",
+      "invalid_status": "Gateway returned an invalid status page.",
+      "unsupported_firmware": "Unsupported firmware."
+    },
+    "abort": {"already_configured": "This gateway is already configured."}
+  },
+  "options": {
+    "step": {
+      "init": {"menu_options": {"status": "Status", "devices": "Devices", "census": "Guided census", "mqtt": "MQTT", "network": "Network", "callback": "Callback", "maintenance": "Maintenance", "danger": "Danger zone", "advanced": "Advanced"}},
+      "status": {"title": "Gateway status", "description": "Refresh gateway diagnostics. Web tools: /test, /request and /help are available at the gateway address.", "data": {"refresh": "Refresh now"}},
+      "devices": {"menu_options": {"device_query": "Query device table", "device_add": "Add device", "device_edit": "Edit device"}},
+      "device_query": {"title": "Query devices", "data": {"query": "Query now"}},
+      "device_add": {"title": "Add device", "data": {"busid": "SCS bus ID", "type": "Device type", "devname": "Name", "maxpos": "Maximum position/time", "resend": "Republish MQTT Discovery"}},
+      "device_edit": {"title": "Edit device", "data": {"busid": "SCS bus ID", "type": "Device type", "devname": "Name", "maxpos": "Maximum position/time", "resend": "Republish MQTT Discovery"}},
+      "census": {"menu_options": {"census_prepare": "Prepare census", "census_start": "Start import", "census_query": "Query progress", "census_stop": "Stop census", "census_resend": "Republish Discovery"}},
+      "census_prepare": {"title": "Prepare census", "description": "This changes the learned-device workflow. After confirming, operate every SCS device before starting the import.", "data": {"confirm": "I understand"}},
+      "census_start": {"title": "Start device import", "description": "Confirm only after every device has generated bus traffic.", "data": {"confirm": "Start"}},
+      "census_query": {"title": "Query census", "data": {"confirm": "Query"}},
+      "census_stop": {"title": "Stop census", "data": {"confirm": "Stop"}},
+      "census_resend": {"title": "Republish MQTT Discovery", "data": {"confirm": "Republish"}},
+      "mqtt": {"title": "Configure gateway MQTT", "description": "Credentials are sent once using unencrypted HTTP GET and are never stored by Home Assistant.", "data": {"broker": "Broker IP", "port": "Port", "username": "Username", "password": "Password", "domain": "Mode", "discovery_options": "Discovery options", "log": "MQTT log", "persistent": "Retained messages", "alexa": "Alexa mode"}},
+      "network": {"title": "Configure gateway network", "description": "Changing Wi-Fi can make the gateway unreachable. Enter its current identifier to confirm.", "data": {"ssid": "SSID", "password": "Wi-Fi password", "ip": "Gateway IP", "gateway": "Router IP", "udp_port": "UDP port", "confirm_mac": "Current gateway identifier"}},
+      "callback": {"title": "Configure HTTP callback", "data": {"callback": "Private callback URL or firmware callback path"}},
+      "maintenance": {"menu_options": {"reset_mqtt": "Reconnect MQTT", "reset_advanced": "Reset processor", "picprog_test": "Test PIC programming", "picprog_flash": "Flash PIC firmware"}},
+      "reset_mqtt": {"title": "Reconnect MQTT", "data": {"confirm": "Reconnect"}},
+      "reset_advanced": {"title": "Reset processor", "data": {"device": "Target", "confirm_mac": "Current gateway identifier"}},
+      "picprog_test": {"title": "Test PIC programming", "data": {"confirm": "Run test"}},
+      "picprog_flash": {"title": "Flash PIC firmware", "description": "High-risk operation. Type FLASH followed by the gateway identifier.", "data": {"confirm": "Confirmation phrase"}},
+      "danger": {"title": "Clear learned devices", "description": "This erases the learned device table. Type CLEAR followed by the gateway identifier.", "data": {"confirm": "Confirmation phrase"}},
+      "advanced": {"title": "Advanced options", "data": {"enable_raw_commands": "Enable raw SCS service", "scan_interval": "Status interval (seconds)"}}
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the gateway.",
+      "confirmation_required": "Confirmation does not match.",
+      "invalid_callback": "Use a private HTTP URL or valid firmware callback path."
+    }
+  }
+}

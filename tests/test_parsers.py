@@ -1,0 +1,28 @@
+"""Protocol parser tests require no gateway or broker."""
+
+from pathlib import Path
+
+from custom_components.scsgate.parsers import parse_devices, parse_status
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_parse_status_redacts_broker_secret() -> None:
+    status = parse_status((FIXTURES / "status_7004.html").read_text(), "192.168.1.20")
+
+    assert status.mac is None
+    assert status.firmware_esp == "VER_7.004"
+    assert status.firmware_pic == ">SCS 80.57"
+    assert status.rssi == -61
+    assert status.mqtt_connected is True
+    assert status.mqtt_broker == "configured"
+    assert status.device_count == 5
+
+
+def test_parse_device_records() -> None:
+    devices = parse_devices((FIXTURES / "devices_7004.html").read_text())
+
+    assert [(item.bus_id, item.type, item.maxpos) for item in devices] == [
+        ("24", 9, 100),
+        ("41", 8, 255),
+    ]

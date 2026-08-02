@@ -1,0 +1,120 @@
+"""Integration-level guard and coordinator tests with Home Assistant test fixtures."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+import voluptuous as vol
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.update_coordinator import UpdateFailed
+
+from custom_components.scsgate import ScsGateRuntimeData, _async_register_services
+from custom_components.scsgate.config_flow import _is_private_host
+from custom_components.scsgate.const import (
+    ATTR_CMD,
+    ATTR_CONFIRM,
+    ATTR_ENTRY_ID,
+    ATTR_FROM,
+    ATTR_RESPONSE,
+    ATTR_TO,
+    ATTR_TYPE,
+    CONF_ENABLE_RAW_COMMANDS,
+    DOMAIN,
+    SERVICE_SEND_RAW_TELEGRAM,
+)
+from custom_components.scsgate.coordinator import ScsGateCoordinator
+from custom_components.scsgate.models import GatewayStatus
+
+
+@pytest.mark.parametrize("host", ["192.168.1.1", "10.0.0.1", "127.0.0.1", "fe80::1"])
+def test_config_flow_accepts_only_local_literal_hosts(host: str) -> None:
+    assert _is_private_host(host)
+
+
+@pytest.mark.parametrize("host", ["8.8.8.8", "gateway.example", "", "192.168.1.999"])
+def test_config_flow_rejects_public_or_unresolved_hosts(host: str) -> None:
+    assert not _is_private_host(host)
+
+
+async def test_coordinator_reads_status_and_preserves_result(hass) -> None:
+    status = GatewayStatus(host="192.168.1.20", mac="AA:BB")
+    client = SimpleNamespace(async_get_status=AsyncMock(return_value=status))
+    entry = SimpleNamespace(
+        options={}, entry_id="entry", unique_id="AA:BB", data={"host": "192.168.1.20"}
+    )
+    coordinator = ScsGateCoordinator(hass, client, entry)
+
+    assert await coordinator._async_update_data() is status
+    client.async_get_status.assert_awaited_once()
+
+
+async def test_coordinator_turns_transport_failure_into_update_failed(hass) -> None:
+    client = SimpleNamespace(async_get_status=AsyncMock(side_effect=OSError("offline")))
+    entry = SimpleNamespace(
+        options={}, entry_id="entry", unique_id=None, data={"host": "192.168.1.20"}
+    )
+    coordinator = ScsGateCoordinator(hass, client, entry)
+
+    with pytest.raises(UpdateFailed, match="Unable to reach"):
+        await coordinator._async_update_data()
+
+
+async def test_raw_service_requires_gateway_option_and_confirmation(hass) -> None:
+    client = SimpleNamespace(async_send_raw_telegram=AsyncMock())
+    entry = SimpleNamespace(options={CONF_ENABLE_RAW_COMMANDS: False})
+    coordinator = SimpleNamespace(config_entry=entry)
+    hass.data[DOMAIN] = {
+        "entry": ScsGateRuntimeData(client=client, coordinator=coordinator)
+    }
+    _async_register_services(hass)
+    data = {
+        ATTR_ENTRY_ID: "entry",
+        ATTR_TYPE: "1",
+        ATTR_FROM: "1",
+        ATTR_TO: "2",
+        ATTR_CMD: "F",
+        ATTR_RESPONSE: "none",
+        ATTR_CONFIRM: True,
+    }
+
+    with pytest.raises(HomeAssistantError, match="disabled"):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_SEND_RAW_TELEGRAM, data, blocking=True
+        )
+    client.async_send_raw_telegram.assert_not_awaited()
+
+    entry.options[CONF_ENABLE_RAW_COMMANDS] = True
+    data[ATTR_CONFIRM] = False
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_SEND_RAW_TELEGRAM, data, blocking=True
+        )
+    client.async_send_raw_telegram.assert_not_awaited()
+
+
+async def test_raw_service_forwards_valid_confirmed_command(hass) -> None:
+    client = SimpleNamespace(async_send_raw_telegram=AsyncMock())
+    entry = SimpleNamespace(options={CONF_ENABLE_RAW_COMMANDS: True})
+    coordinator = SimpleNamespace(config_entry=entry)
+    hass.data[DOMAIN] = {
+        "entry": ScsGateRuntimeData(client=client, coordinator=coordinator)
+    }
+    _async_register_services(hass)
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SEND_RAW_TELEGRAM,
+        {
+            ATTR_ENTRY_ID: "entry",
+            ATTR_TYPE: "1",
+            ATTR_FROM: "A",
+            ATTR_TO: "2",
+            ATTR_CMD: "F",
+            ATTR_CONFIRM: True,
+        },
+        blocking=True,
+    )
+
+    client.async_send_raw_telegram.assert_awaited_once_with("1", "A", "2", "F", "none")

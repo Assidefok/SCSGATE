@@ -1,0 +1,35 @@
+{
+  "title": "SCSGATE",
+  "config": {
+    "step": {"user": {"title": "Connecta SCSGATE", "description": "Introdueix l'adreça IP privada/local del gateway.", "data": {"host": "Adreça IP", "port": "Port HTTP"}}},
+    "error": {"private_host_required": "Utilitza una IP privada o local literal.", "cannot_connect": "No es pot connectar amb el gateway.", "invalid_status": "El gateway ha retornat un estat invàlid.", "unsupported_firmware": "Firmware no compatible."},
+    "abort": {"already_configured": "Aquest gateway ja està configurat."}
+  },
+  "options": {
+    "step": {
+      "init": {"menu_options": {"status": "Estat", "devices": "Dispositius", "census": "Cens guiat", "mqtt": "MQTT", "network": "Xarxa", "callback": "Callback", "maintenance": "Manteniment", "danger": "Zona perillosa", "advanced": "Avançat"}},
+      "status": {"title": "Estat del gateway", "data": {"refresh": "Actualitza ara"}},
+      "devices": {"menu_options": {"device_query": "Consulta la taula", "device_add": "Afegeix dispositiu", "device_edit": "Edita dispositiu"}},
+      "device_query": {"title": "Consulta dispositius", "data": {"query": "Consulta ara"}},
+      "device_add": {"title": "Afegeix dispositiu", "data": {"busid": "ID bus SCS", "type": "Tipus", "devname": "Nom", "maxpos": "Posició/temps màxim", "resend": "Republica MQTT Discovery"}},
+      "device_edit": {"title": "Edita dispositiu", "data": {"busid": "ID bus SCS", "type": "Tipus", "devname": "Nom", "maxpos": "Posició/temps màxim", "resend": "Republica MQTT Discovery"}},
+      "census": {"menu_options": {"census_prepare": "Prepara cens", "census_start": "Inicia importació", "census_query": "Consulta progrés", "census_stop": "Atura cens", "census_resend": "Republica Discovery"}},
+      "census_prepare": {"title": "Prepara cens", "data": {"confirm": "Ho entenc"}},
+      "census_start": {"title": "Inicia importació", "data": {"confirm": "Inicia"}},
+      "census_query": {"title": "Consulta cens", "data": {"confirm": "Consulta"}},
+      "census_stop": {"title": "Atura cens", "data": {"confirm": "Atura"}},
+      "census_resend": {"title": "Republica MQTT Discovery", "data": {"confirm": "Republica"}},
+      "mqtt": {"title": "Configura MQTT", "description": "Les credencials s'envien una sola vegada per HTTP GET sense xifrar i Home Assistant no les desa.", "data": {"broker": "IP broker", "port": "Port", "username": "Usuari", "password": "Contrasenya", "domain": "Mode", "discovery_options": "Opcions Discovery", "log": "Log MQTT", "persistent": "Missatges retinguts", "alexa": "Mode Alexa"}},
+      "network": {"title": "Configura la xarxa", "data": {"ssid": "SSID", "password": "Contrasenya Wi-Fi", "ip": "IP gateway", "gateway": "IP router", "udp_port": "Port UDP", "confirm_mac": "Identificador actual"}},
+      "callback": {"title": "Configura callback HTTP", "data": {"callback": "URL privada o ruta firmware"}},
+      "maintenance": {"menu_options": {"reset_mqtt": "Reconnecta MQTT", "reset_advanced": "Reinicia processador", "picprog_test": "Prova programació PIC", "picprog_flash": "Programa firmware PIC"}},
+      "reset_mqtt": {"title": "Reconnecta MQTT", "data": {"confirm": "Reconnecta"}},
+      "reset_advanced": {"title": "Reinicia processador", "data": {"device": "Objectiu", "confirm_mac": "Identificador actual"}},
+      "picprog_test": {"title": "Prova programació PIC", "data": {"confirm": "Executa prova"}},
+      "picprog_flash": {"title": "Programa firmware PIC", "data": {"confirm": "FLASH identificador"}},
+      "danger": {"title": "Esborra dispositius apresos", "data": {"confirm": "CLEAR identificador"}},
+      "advanced": {"title": "Opcions avançades", "data": {"enable_raw_commands": "Activa servei SCS cru", "scan_interval": "Interval d'estat (segons)"}}
+    },
+    "error": {"cannot_connect": "No es pot connectar amb el gateway.", "confirmation_required": "La confirmació no coincideix.", "invalid_callback": "Callback privat invàlid."}
+  }
+}

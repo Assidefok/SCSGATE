@@ -1,0 +1,15 @@
+{
+  "domain": "scsgate",
+  "name": "SCSGATE",
+  "after_dependencies": ["mqtt"],
+  "codeowners": ["@AleixRocal"],
+  "config_flow": true,
+  "dependencies": ["mqtt"],
+  "documentation": "https://github.com/AleixRocal/SCSGATE",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/AleixRocal/SCSGATE/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
+

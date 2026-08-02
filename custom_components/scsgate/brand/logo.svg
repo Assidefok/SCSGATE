@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80">
+  <rect width="320" height="80" rx="16" fill="#03a9f4"/>
+  <path fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" d="M18 25h20m14 0h20M18 55h20m14 0h20M38 12v26m14 4v26"/>
+  <circle cx="45" cy="25" r="7" fill="#fff"/>
+  <circle cx="45" cy="55" r="7" fill="#fff"/>
+  <text x="88" y="52" fill="#fff" font-family="sans-serif" font-size="38" font-weight="700">SCSGATE</text>
+</svg>
+

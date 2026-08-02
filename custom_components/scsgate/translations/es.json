@@ -1,0 +1,35 @@
+{
+  "title": "SCSGATE",
+  "config": {
+    "step": {"user": {"title": "Conectar SCSGATE", "description": "Introduce la dirección IP privada/local del gateway.", "data": {"host": "Dirección IP", "port": "Puerto HTTP"}}},
+    "error": {"private_host_required": "Usa una IP privada o local literal.", "cannot_connect": "No se puede conectar con el gateway.", "invalid_status": "El gateway devolvió un estado no válido.", "unsupported_firmware": "Firmware no compatible."},
+    "abort": {"already_configured": "Este gateway ya está configurado."}
+  },
+  "options": {
+    "step": {
+      "init": {"menu_options": {"status": "Estado", "devices": "Dispositivos", "census": "Censo guiado", "mqtt": "MQTT", "network": "Red", "callback": "Callback", "maintenance": "Mantenimiento", "danger": "Zona peligrosa", "advanced": "Avanzado"}},
+      "status": {"title": "Estado del gateway", "data": {"refresh": "Actualizar ahora"}},
+      "devices": {"menu_options": {"device_query": "Consultar tabla", "device_add": "Añadir dispositivo", "device_edit": "Editar dispositivo"}},
+      "device_query": {"title": "Consultar dispositivos", "data": {"query": "Consultar ahora"}},
+      "device_add": {"title": "Añadir dispositivo", "data": {"busid": "ID bus SCS", "type": "Tipo", "devname": "Nombre", "maxpos": "Posición/tiempo máximo", "resend": "Republicar MQTT Discovery"}},
+      "device_edit": {"title": "Editar dispositivo", "data": {"busid": "ID bus SCS", "type": "Tipo", "devname": "Nombre", "maxpos": "Posición/tiempo máximo", "resend": "Republicar MQTT Discovery"}},
+      "census": {"menu_options": {"census_prepare": "Preparar censo", "census_start": "Iniciar importación", "census_query": "Consultar progreso", "census_stop": "Detener censo", "census_resend": "Republicar Discovery"}},
+      "census_prepare": {"title": "Preparar censo", "data": {"confirm": "Lo entiendo"}},
+      "census_start": {"title": "Iniciar importación", "data": {"confirm": "Iniciar"}},
+      "census_query": {"title": "Consultar censo", "data": {"confirm": "Consultar"}},
+      "census_stop": {"title": "Detener censo", "data": {"confirm": "Detener"}},
+      "census_resend": {"title": "Republicar MQTT Discovery", "data": {"confirm": "Republicar"}},
+      "mqtt": {"title": "Configurar MQTT", "description": "Las credenciales se envían una sola vez mediante HTTP GET sin cifrar y Home Assistant no las guarda.", "data": {"broker": "IP broker", "port": "Puerto", "username": "Usuario", "password": "Contraseña", "domain": "Modo", "discovery_options": "Opciones Discovery", "log": "Log MQTT", "persistent": "Mensajes retenidos", "alexa": "Modo Alexa"}},
+      "network": {"title": "Configurar red", "data": {"ssid": "SSID", "password": "Contraseña Wi-Fi", "ip": "IP gateway", "gateway": "IP router", "udp_port": "Puerto UDP", "confirm_mac": "Identificador actual"}},
+      "callback": {"title": "Configurar callback HTTP", "data": {"callback": "URL privada o ruta firmware"}},
+      "maintenance": {"menu_options": {"reset_mqtt": "Reconectar MQTT", "reset_advanced": "Reiniciar procesador", "picprog_test": "Probar programación PIC", "picprog_flash": "Programar firmware PIC"}},
+      "reset_mqtt": {"title": "Reconectar MQTT", "data": {"confirm": "Reconectar"}},
+      "reset_advanced": {"title": "Reiniciar procesador", "data": {"device": "Objetivo", "confirm_mac": "Identificador actual"}},
+      "picprog_test": {"title": "Probar programación PIC", "data": {"confirm": "Ejecutar prueba"}},
+      "picprog_flash": {"title": "Programar firmware PIC", "data": {"confirm": "FLASH identificador"}},
+      "danger": {"title": "Borrar dispositivos aprendidos", "data": {"confirm": "CLEAR identificador"}},
+      "advanced": {"title": "Opciones avanzadas", "data": {"enable_raw_commands": "Activar servicio SCS crudo", "scan_interval": "Intervalo de estado (segundos)"}}
+    },
+    "error": {"cannot_connect": "No se puede conectar con el gateway.", "confirmation_required": "La confirmación no coincide.", "invalid_callback": "Callback privado no válido."}
+  }
+}

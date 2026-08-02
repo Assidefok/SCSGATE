@@ -1,0 +1,38 @@
+send_raw_telegram:
+  name: Send raw SCS telegram
+  description: >-
+    Send a raw SCS telegram. Enable raw commands in this SCSGATE entry's options
+    and set confirm to true. Do not use for ordinary device control.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    type:
+      required: true
+      selector:
+        text:
+    from:
+      required: true
+      selector:
+        text:
+    to:
+      required: true
+      selector:
+        text:
+    cmd:
+      required: true
+      selector:
+        text:
+    response:
+      default: none
+      selector:
+        select:
+          options:
+            - none
+            - y
+            - i
+    confirm:
+      required: true
+      selector:
+        boolean:
