@@ -24,6 +24,11 @@ leaves that define commented out. The integration therefore monitors the
 normal `scs/#` output and `SCSERROR`, while accepting `SCSLOG` when a compatible
 custom firmware build publishes it.
 
+Firmware exposes one global `prepare/start/query/stop` census. It does not
+provide a separate cover-only discovery request. The integration's
+**Discover covers** action therefore supplies cover-specific UP/STOP/DOWN
+instructions while still preserving and presenting the complete global result.
+
 The integration caps callback strings at 97 visible characters. Firmware starts
 the callback at EEPROM offset 102 and the next field at 200, so the apparent
 128-character web form can overwrite adjacent EEPROM fields.

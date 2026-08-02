@@ -41,6 +41,9 @@ def test_parse_real_7004_device_list_fixture() -> None:
         ("42", 19),
         ("43", 11),
     ]
+    percentage_cover = devices[3]
+    assert percentage_cover.name == "Living cover"
+    assert percentage_cover.maxpos == 16
 
 
 def test_parser_debug_logs_counts_without_payload(
