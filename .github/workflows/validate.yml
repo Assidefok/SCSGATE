@@ -17,6 +17,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pull-request-title:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require a Conventional Commit pull-request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+
+          title = os.environ["PR_TITLE"]
+          pattern = re.compile(
+              r"^(feat|fix|docs|refactor|perf|test|build|ci|chore|revert)"
+              r"(\([a-z0-9._/-]+\))?!?: .+"
+          )
+          if not pattern.fullmatch(title):
+              sys.exit(
+                  "PR title must use Conventional Commits, for example "
+                  "'fix: restore MQTT discovery'."
+              )
+          PY
+
   hassfest:
     runs-on: ubuntu-latest
     timeout-minutes: 15
