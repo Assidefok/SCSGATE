@@ -110,13 +110,18 @@ buffer.
 
 ### Guided device learning
 
-Choose **Configure > Devices > Discover devices**, then physically operate each
-required SCS device. For focused guidance choose **Discover covers**, operate
-every device because firmware rebuilds one global table, and exercise
-UP/STOP/DOWN on every cover. Starting the import transfers the PIC's learned
-table to the ESP. SCSGATE polls without blocking Home Assistant, then shows `N`
-numbered entries with exact addresses, inferred types, names and available
-cover calibration. Accept the list, repeat the scan, or choose the manual-add
-path for a missing light, dimmer, cover, generic device, or alarm.
+Choose **Configure > Add new SCS devices**. The three-step wizard reads the
+current device table, asks how many devices are being added, then prepares the
+firmware census. Operate every existing device once and then each new device;
+exercise UP/STOP/DOWN on covers and change both state and level on dimmers.
+
+Starting the import transfers the PIC's learned table to the ESP. SCSGATE polls
+without blocking Home Assistant and compares bus IDs before and after the
+census. The review shows expected, detected and missing counts plus both the new
+IDs and the complete table. While devices are missing it defaults to repeating
+the census; manual addition stays inside the wizard. Acceptance always stops
+learning before republishing MQTT Discovery.
+
+Firmware 7.004 rebuilds one global table, even when only covers are new.
 If the browser flow is abandoned, a best-effort cleanup stops PIC learning
 after ten minutes; **Stop an abandoned census** is also available immediately.

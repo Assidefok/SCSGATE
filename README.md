@@ -93,12 +93,12 @@ same broker. Stock firmware 7.004 compiles its raw
 UART `SCSLOG` publisher out; on that build the viewer shows interpreted MQTT
 activity, not every electrical bus telegram.
 
-**View device table** now returns `N` numbered entries with address, type, name,
-and percentage-cover calibration when available. **Discover devices** runs the
-complete guided census. **Discover covers** uses the same firmware census but
-adds explicit UP/STOP/DOWN guidance and reports the number of covers separately.
-Firmware 7.004 has no safe cover-only discovery route, so both actions always
-show the complete learned table before it is accepted.
+**Add new SCS devices** opens a three-step wizard. It snapshots existing bus
+IDs, asks for the expected number of new devices, guides the physical bus
+actions, and compares the final table with the baseline. Missing devices default
+to rescan or in-wizard manual addition; acceptance stops learning before MQTT
+Discovery is republished. Firmware 7.004 has no cover-only census, so covers
+still require a global scan with explicit UP/STOP/DOWN actions.
 
 ### Advanced TCP/PIC capture
 

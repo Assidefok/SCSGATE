@@ -43,8 +43,98 @@ async def test_device_query_returns_one_visible_line_per_device(monkeypatch) -> 
 async def test_device_menu_exposes_general_and_cover_discovery() -> None:
     result = await ScsGateOptionsFlow().async_step_devices()
 
+    assert "guided_census" in result["menu_options"]
     assert "discover_devices" in result["menu_options"]
     assert "discover_covers" in result["menu_options"]
+
+
+async def test_guided_census_captures_baseline_and_expected_total(
+    monkeypatch,
+) -> None:
+    baseline = [
+        GatewayDevice(bus_id="11", type=1, name="Kitchen"),
+        GatewayDevice(bus_id="12", type=3, name="Dining"),
+    ]
+    client = SimpleNamespace(
+        async_query_devices=AsyncMock(return_value=baseline),
+        async_mqtt_devices=AsyncMock(return_value=[]),
+    )
+    monkeypatch.setattr(ScsGateOptionsFlow, "_client", property(lambda _flow: client))
+    flow = ScsGateOptionsFlow()
+    flow._schedule_census_cleanup = Mock()
+
+    intro = await flow.async_step_guided_census()
+    result = await flow.async_step_guided_census(
+        {"new_device_count": 4, "include_covers": True, "confirm": True}
+    )
+
+    assert intro["description_placeholders"]["known_count"] == "2"
+    assert result["step_id"] == "census_start"
+    assert result["description_placeholders"] == {
+        "known_count": "2",
+        "new_count": "4",
+        "expected_count": "6",
+    }
+    assert flow._census_focus == "covers"
+    assert flow._census_expected_new == 4
+    assert client.async_query_devices.await_count == 1
+    client.async_mqtt_devices.assert_awaited_once_with("prepare")
+
+
+async def test_guided_review_counts_new_bus_ids_and_blocks_easy_accept() -> None:
+    flow = ScsGateOptionsFlow()
+    flow._census_baseline_devices = [
+        GatewayDevice(bus_id="11", type=1, name="Kitchen"),
+        GatewayDevice(bus_id="12", type=3, name="Dining"),
+    ]
+    flow._census_expected_new = 4
+    flow._census_devices = [
+        *flow._census_baseline_devices,
+        GatewayDevice(bus_id="21", type=1, name="New light"),
+        GatewayDevice(bus_id="22", type=4, name="New dimmer"),
+    ]
+
+    result = await flow.async_step_census_review()
+
+    placeholders = result["description_placeholders"]
+    assert placeholders["known_count"] == "2"
+    assert placeholders["expected_new"] == "4"
+    assert placeholders["new_count"] == "2"
+    assert placeholders["missing_count"] == "2"
+    assert "21" in placeholders["new_devices"]
+    schema = result["data_schema"]
+    assert schema({"action": "scan_again"})["action"] == "scan_again"
+    assert schema({"action": "add_manual"})["action"] == "add_manual"
+    assert schema({"action": "accept_anyway"})["action"] == "accept_anyway"
+
+
+async def test_manual_add_stays_in_wizard_and_refreshes_comparison(
+    monkeypatch,
+) -> None:
+    devices = [GatewayDevice(bus_id="21", type=1, name="New light")]
+    client = SimpleNamespace(
+        async_update_device=AsyncMock(),
+        async_query_devices=AsyncMock(return_value=devices),
+    )
+    monkeypatch.setattr(ScsGateOptionsFlow, "_client", property(lambda _flow: client))
+    flow = ScsGateOptionsFlow()
+    flow._census_expected_new = 1
+
+    result = await flow.async_step_census_manual_add(
+        {
+            "busid": "21",
+            "type": 1,
+            "devname": "New light",
+            "maxpos": 100,
+        }
+    )
+
+    assert result["step_id"] == "census_review"
+    assert result["description_placeholders"]["new_count"] == "1"
+    client.async_update_device.assert_awaited_once_with(
+        "21", device_type=1, name="New light", max_position=100
+    )
+    client.async_query_devices.assert_awaited_once()
 
 
 async def test_cover_discovery_prepares_real_global_census(monkeypatch) -> None:
