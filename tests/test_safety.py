@@ -28,6 +28,8 @@ from custom_components.scsgate.const import (
     DOMAIN,
     SERVICE_EXPORT_BUS_LOG,
     SERVICE_SEND_RAW_TELEGRAM,
+    SERVICE_START_ADVANCED_DEBUG,
+    SERVICE_STOP_ADVANCED_DEBUG,
 )
 from custom_components.scsgate.coordinator import ScsGateCoordinator
 from custom_components.scsgate.diagnostics import async_get_config_entry_diagnostics
@@ -239,3 +241,47 @@ async def test_bus_log_export_requires_confirmation_and_returns_response(hass) -
 
     assert response["messages"][0]["topic"] == "scs/switch/state/24"
     assert response["scope"].startswith("Home Assistant MQTT broker")
+
+
+async def test_advanced_debug_services_require_typed_start_confirmation(hass) -> None:
+    monitor = SimpleNamespace(
+        async_start=AsyncMock(),
+        async_stop=AsyncMock(),
+        async_recover=AsyncMock(),
+        export=lambda _limit: {"messages": []},
+        clear=lambda: None,
+    )
+    entry = SimpleNamespace(entry_id="entry", unique_id="AA:BB", options={})
+    coordinator = SimpleNamespace(config_entry=entry, data=SimpleNamespace(mac="AA:BB"))
+    hass.data[DOMAIN] = {
+        "entry": ScsGateRuntimeData(
+            client=SimpleNamespace(),
+            coordinator=coordinator,
+            advanced_debug=monitor,
+        )
+    }
+    _async_register_services(hass)
+
+    with pytest.raises(HomeAssistantError, match="confirmation"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_START_ADVANCED_DEBUG,
+            {ATTR_ENTRY_ID: "entry", ATTR_CONFIRM: "DEBUG WRONG"},
+            blocking=True,
+        )
+    monitor.async_start.assert_not_awaited()
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_START_ADVANCED_DEBUG,
+        {ATTR_ENTRY_ID: "entry", ATTR_CONFIRM: "DEBUG AA:BB"},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_STOP_ADVANCED_DEBUG,
+        {ATTR_ENTRY_ID: "entry", ATTR_CONFIRM: True},
+        blocking=True,
+    )
+    monitor.async_start.assert_awaited_once()
+    monitor.async_stop.assert_awaited_once()

@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import logging
 import re
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .advanced_debug import AdvancedDebugError, AdvancedTcpDebugMonitor
 from .bus_monitor import BusMonitor
 from .const import (
     ATTR_CMD,
@@ -25,6 +27,9 @@ from .const import (
     ATTR_RESPONSE,
     ATTR_TO,
     ATTR_TYPE,
+    CONF_ADVANCED_TCP_DEBUG,
+    CONF_ADVANCED_TCP_DEBUG_DURATION,
+    CONF_ADVANCED_TCP_DEBUG_LIMIT,
     CONF_BUS_MONITOR,
     CONF_BUS_MONITOR_LIMIT,
     CONF_ENABLE_RAW_COMMANDS,
@@ -33,12 +38,19 @@ from .const import (
     CONF_PROTOCOL_DEBUG,
     DATA_BUS_MONITOR,
     DATA_BUS_MONITOR_LOCK,
+    DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
+    DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
     DEFAULT_BUS_MONITOR_LIMIT,
     DOMAIN,
     PLATFORMS,
+    SERVICE_CLEAR_ADVANCED_DEBUG,
     SERVICE_CLEAR_BUS_LOG,
+    SERVICE_EXPORT_ADVANCED_DEBUG,
     SERVICE_EXPORT_BUS_LOG,
+    SERVICE_RECOVER_ADVANCED_DEBUG,
     SERVICE_SEND_RAW_TELEGRAM,
+    SERVICE_START_ADVANCED_DEBUG,
+    SERVICE_STOP_ADVANCED_DEBUG,
     VALID_RESPONSES,
 )
 from .coordinator import ScsGateCoordinator
@@ -54,6 +66,7 @@ class ScsGateRuntimeData:
     client: Any
     coordinator: ScsGateCoordinator
     bus_monitor: BusMonitor | None = None
+    advanced_debug: AdvancedTcpDebugMonitor | None = None
 
 
 async def _async_acquire_bus_monitor(
@@ -110,8 +123,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry.entry_id,
             entry.options.get(CONF_BUS_MONITOR_LIMIT, DEFAULT_BUS_MONITOR_LIMIT),
         )
+    advanced_debug = None
+    if entry.options.get(CONF_ADVANCED_TCP_DEBUG, False):
+        advanced_debug = AdvancedTcpDebugMonitor(
+            entry.data[CONF_HOST],
+            message_limit=entry.options.get(
+                CONF_ADVANCED_TCP_DEBUG_LIMIT, DEFAULT_ADVANCED_TCP_DEBUG_LIMIT
+            ),
+            duration=entry.options.get(
+                CONF_ADVANCED_TCP_DEBUG_DURATION, DEFAULT_ADVANCED_TCP_DEBUG_DURATION
+            ),
+        )
     entry.runtime_data = ScsGateRuntimeData(
-        client=client, coordinator=coordinator, bus_monitor=bus_monitor
+        client=client,
+        coordinator=coordinator,
+        bus_monitor=bus_monitor,
+        advanced_debug=advanced_debug,
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.runtime_data
     try:
@@ -119,6 +146,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _async_register_services(hass)
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
+        if advanced_debug is not None:
+            with suppress(AdvancedDebugError):
+                await advanced_debug.async_shutdown()
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         if bus_monitor is not None:
             async with hass.data[DOMAIN][DATA_BUS_MONITOR_LOCK]:
@@ -131,9 +161,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload entry resources and entity platforms."""
+    runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    advanced_debug = getattr(runtime, "advanced_debug", None)
+    if advanced_debug is not None:
+        try:
+            await advanced_debug.async_shutdown()
+        except AdvancedDebugError:
+            _LOGGER.warning(
+                "Keeping SCSGATE loaded because PIC restoration is required"
+            )
+            return False
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
         monitor = getattr(runtime, "bus_monitor", None)
         if monitor is not None:
             async with hass.data[DOMAIN][DATA_BUS_MONITOR_LOCK]:
@@ -148,6 +187,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_SEND_RAW_TELEGRAM)
             hass.services.async_remove(DOMAIN, SERVICE_EXPORT_BUS_LOG)
             hass.services.async_remove(DOMAIN, SERVICE_CLEAR_BUS_LOG)
+            hass.services.async_remove(DOMAIN, SERVICE_START_ADVANCED_DEBUG)
+            hass.services.async_remove(DOMAIN, SERVICE_STOP_ADVANCED_DEBUG)
+            hass.services.async_remove(DOMAIN, SERVICE_RECOVER_ADVANCED_DEBUG)
+            hass.services.async_remove(DOMAIN, SERVICE_EXPORT_ADVANCED_DEBUG)
+            hass.services.async_remove(DOMAIN, SERVICE_CLEAR_ADVANCED_DEBUG)
     return unloaded
 
 
@@ -208,6 +252,60 @@ def _async_register_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError("Bus monitor is disabled for this gateway")
         return monitor
 
+    def get_advanced_monitor(
+        call: ServiceCall,
+    ) -> tuple[ScsGateRuntimeData, AdvancedTcpDebugMonitor]:
+        runtime = hass.data.get(DOMAIN, {}).get(call.data[ATTR_ENTRY_ID])
+        monitor = getattr(runtime, "advanced_debug", None)
+        if runtime is None or monitor is None:
+            raise HomeAssistantError("Advanced TCP debug is disabled for this gateway")
+        return runtime, monitor
+
+    def debug_identifier(runtime: ScsGateRuntimeData) -> str:
+        status = runtime.coordinator.data
+        return str(
+            getattr(status, "mac", None)
+            or runtime.coordinator.config_entry.unique_id
+            or runtime.coordinator.config_entry.entry_id
+        ).upper()
+
+    async def handle_start_advanced_debug(call: ServiceCall) -> None:
+        runtime, monitor = get_advanced_monitor(call)
+        if call.data[ATTR_CONFIRM].upper() != f"DEBUG {debug_identifier(runtime)}":
+            raise HomeAssistantError("Type the required DEBUG confirmation phrase")
+        try:
+            await monitor.async_start()
+        except AdvancedDebugError as err:
+            raise HomeAssistantError("Advanced TCP debug could not start") from err
+
+    async def handle_stop_advanced_debug(call: ServiceCall) -> None:
+        _, monitor = get_advanced_monitor(call)
+        try:
+            await monitor.async_stop()
+        except AdvancedDebugError as err:
+            raise HomeAssistantError(
+                "Gateway PIC settings could not be restored"
+            ) from err
+
+    async def handle_recover_advanced_debug(call: ServiceCall) -> None:
+        runtime, monitor = get_advanced_monitor(call)
+        if call.data[ATTR_CONFIRM].upper() != f"RECOVER {debug_identifier(runtime)}":
+            raise HomeAssistantError("Type the required RECOVER confirmation phrase")
+        try:
+            await monitor.async_recover()
+        except AdvancedDebugError as err:
+            raise HomeAssistantError(
+                "Gateway PIC settings could not be restored"
+            ) from err
+
+    async def handle_export_advanced_debug(call: ServiceCall) -> dict[str, Any]:
+        _, monitor = get_advanced_monitor(call)
+        return monitor.export(call.data[ATTR_LIMIT])
+
+    async def handle_clear_advanced_debug(call: ServiceCall) -> None:
+        _, monitor = get_advanced_monitor(call)
+        monitor.clear()
+
     async def handle_export_bus_log(call: ServiceCall) -> dict[str, Any]:
         return get_monitor(call).export(call.data[ATTR_LIMIT])
 
@@ -248,4 +346,54 @@ def _async_register_services(hass: HomeAssistant) -> None:
                     vol.Required(ATTR_CONFIRM): True,
                 }
             ),
+        )
+    advanced_confirm_schema = vol.Schema(
+        {vol.Required(ATTR_ENTRY_ID): str, vol.Required(ATTR_CONFIRM): str}
+    )
+    guarded_entry_schema = vol.Schema(
+        {vol.Required(ATTR_ENTRY_ID): str, vol.Required(ATTR_CONFIRM): True}
+    )
+    if not hass.services.has_service(DOMAIN, SERVICE_START_ADVANCED_DEBUG):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_START_ADVANCED_DEBUG,
+            handle_start_advanced_debug,
+            schema=advanced_confirm_schema,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_STOP_ADVANCED_DEBUG):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_STOP_ADVANCED_DEBUG,
+            handle_stop_advanced_debug,
+            schema=guarded_entry_schema,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_RECOVER_ADVANCED_DEBUG):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_RECOVER_ADVANCED_DEBUG,
+            handle_recover_advanced_debug,
+            schema=advanced_confirm_schema,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_ADVANCED_DEBUG):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_EXPORT_ADVANCED_DEBUG,
+            handle_export_advanced_debug,
+            schema=vol.Schema(
+                {
+                    vol.Required(ATTR_ENTRY_ID): str,
+                    vol.Optional(
+                        ATTR_LIMIT, default=DEFAULT_ADVANCED_TCP_DEBUG_LIMIT
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=1000)),
+                    vol.Required(ATTR_CONFIRM): True,
+                }
+            ),
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_CLEAR_ADVANCED_DEBUG):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CLEAR_ADVANCED_DEBUG,
+            handle_clear_advanced_debug,
+            schema=guarded_entry_schema,
         )

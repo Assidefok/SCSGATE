@@ -24,10 +24,15 @@ from .api import (
     GatewayValidationError,
 )
 from .const import (
+    CONF_ADVANCED_TCP_DEBUG,
+    CONF_ADVANCED_TCP_DEBUG_DURATION,
+    CONF_ADVANCED_TCP_DEBUG_LIMIT,
     CONF_BUS_MONITOR,
     CONF_BUS_MONITOR_LIMIT,
     CONF_LAST_CENSUS,
     CONF_PROTOCOL_DEBUG,
+    DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
+    DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
     DEFAULT_BUS_MONITOR_LIMIT,
     DOMAIN,
     MAX_CALLBACK_LENGTH,
@@ -905,6 +910,13 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     CONF_PROTOCOL_DEBUG: user_input[CONF_PROTOCOL_DEBUG],
                     CONF_BUS_MONITOR: user_input[CONF_BUS_MONITOR],
                     CONF_BUS_MONITOR_LIMIT: user_input[CONF_BUS_MONITOR_LIMIT],
+                    CONF_ADVANCED_TCP_DEBUG: user_input[CONF_ADVANCED_TCP_DEBUG],
+                    CONF_ADVANCED_TCP_DEBUG_LIMIT: user_input[
+                        CONF_ADVANCED_TCP_DEBUG_LIMIT
+                    ],
+                    CONF_ADVANCED_TCP_DEBUG_DURATION: user_input[
+                        CONF_ADVANCED_TCP_DEBUG_DURATION
+                    ],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 },
             )
@@ -938,6 +950,26 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                             CONF_BUS_MONITOR_LIMIT, DEFAULT_BUS_MONITOR_LIMIT
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=10, max=500)),
+                    vol.Required(
+                        CONF_ADVANCED_TCP_DEBUG,
+                        default=self.config_entry.options.get(
+                            CONF_ADVANCED_TCP_DEBUG, False
+                        ),
+                    ): bool,
+                    vol.Required(
+                        CONF_ADVANCED_TCP_DEBUG_LIMIT,
+                        default=self.config_entry.options.get(
+                            CONF_ADVANCED_TCP_DEBUG_LIMIT,
+                            DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=50, max=1000)),
+                    vol.Required(
+                        CONF_ADVANCED_TCP_DEBUG_DURATION,
+                        default=self.config_entry.options.get(
+                            CONF_ADVANCED_TCP_DEBUG_DURATION,
+                            DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
                 }
             ),
         )

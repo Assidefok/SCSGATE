@@ -76,3 +76,87 @@ clear_bus_log:
       required: true
       selector:
         boolean:
+
+start_advanced_debug:
+  name: Start advanced TCP debug
+  description: >-
+    Temporarily captures the PIC's SCS receive log through the unauthenticated
+    LAN-only TCP port 5045. Only one client can connect. Captured addresses and
+    activity may reveal occupancy. Type DEBUG followed by the gateway identifier.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
+    confirm:
+      required: true
+      selector:
+        text:
+
+stop_advanced_debug:
+  name: Stop advanced TCP debug
+  description: Stop capture and restore the stock PIC/MQTT operating settings.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
+    confirm:
+      required: true
+      selector:
+        boolean:
+
+recover_advanced_debug:
+  name: Recover advanced TCP debug
+  description: >-
+    Reconnect only to restore stock PIC settings after an interrupted capture.
+    Type RECOVER followed by the gateway identifier.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
+    confirm:
+      required: true
+      selector:
+        text:
+
+export_advanced_debug:
+  name: Export advanced debug capture
+  description: >-
+    Explicitly returns the volatile capture. It may contain device addresses,
+    commands and occupancy patterns and is never included in diagnostics.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
+    limit:
+      default: 200
+      selector:
+        number:
+          min: 1
+          max: 1000
+          mode: box
+    confirm:
+      required: true
+      selector:
+        boolean:
+
+clear_advanced_debug:
+  name: Clear advanced debug capture
+  description: Clear captured messages from volatile memory.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
+    confirm:
+      required: true
+      selector:
+        boolean:

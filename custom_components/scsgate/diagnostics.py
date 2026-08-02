@@ -46,6 +46,9 @@ async def async_get_config_entry_diagnostics(
         getattr(runtime, "client", None), "protocol_debug_diagnostics", {}
     )
     bus_monitor = getattr(getattr(runtime, "bus_monitor", None), "diagnostics", {})
+    advanced_debug = getattr(
+        getattr(runtime, "advanced_debug", None), "diagnostics", {}
+    )
     return async_redact_data(
         {
             "entry": dict(entry.data),
@@ -54,6 +57,7 @@ async def async_get_config_entry_diagnostics(
             "transport": transport,
             "protocol_debug": protocol_debug,
             "bus_monitor": bus_monitor,
+            "advanced_debug": advanced_debug,
         },
         _REDACT,
     )
