@@ -13,7 +13,7 @@ loads the integration from the `scsgate` directory.
 
 ## HACS after publication
 
-Once the GitHub repository is public, add `AleixRocal/SCSGATE` in HACS as a
+Once the GitHub repository is public, add `Assidefok/SCSGATE` in HACS as a
 custom repository of type **Integration**, install it, and restart Home
 Assistant. HACS installs it under `custom_components/scsgate`. Releases should
 be published as GitHub releases using the same SemVer version as
