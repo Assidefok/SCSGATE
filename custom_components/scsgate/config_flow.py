@@ -24,14 +24,20 @@ from .api import (
     GatewayValidationError,
 )
 from .const import (
+    CONF_ADVANCED_TCP_DEBUG,
+    CONF_ADVANCED_TCP_DEBUG_DURATION,
+    CONF_ADVANCED_TCP_DEBUG_LIMIT,
     CONF_BUS_MONITOR,
     CONF_BUS_MONITOR_LIMIT,
     CONF_LAST_CENSUS,
     CONF_PROTOCOL_DEBUG,
+    DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
+    DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
     DEFAULT_BUS_MONITOR_LIMIT,
     DOMAIN,
     MAX_CALLBACK_LENGTH,
 )
+from .models import GatewayDevice
 
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ENABLE_RAW = "enable_raw_commands"
@@ -39,6 +45,18 @@ CONF_LAST_SNAPSHOT = "last_device_snapshot"
 DEFAULT_PORT = 80
 DEFAULT_SCAN_INTERVAL = 300
 DEVICE_TYPES = {1, 3, 4, 8, 9, 11, 14, 18, 19}
+COVER_DEVICE_TYPES = frozenset({8, 9, 18, 19})
+DEVICE_TYPE_LABELS = {
+    1: "switch/light",
+    3: "dimmer",
+    4: "dimmer",
+    8: "cover",
+    9: "percentage cover",
+    11: "generic",
+    14: "alarm",
+    18: "cover U",
+    19: "percentage cover U",
+}
 _LOGGER = logging.getLogger(__name__)
 _ADMIN_OPERATION_COUNTER = count(1)
 
@@ -57,6 +75,29 @@ def _is_private_host(host: str) -> bool:
     except ValueError:
         return False
     return bool(address.is_private or address.is_loopback or address.is_link_local)
+
+
+def _safe_device_name(name: str | None) -> str:
+    """Bound a firmware-provided name before presenting it in a flow."""
+    if not name:
+        return ""
+    return "".join(character for character in str(name) if character.isprintable())[:64]
+
+
+def _format_device_lines(devices: list[GatewayDevice]) -> str:
+    """Render one stable, human-readable line for every firmware table entry."""
+    lines: list[str] = []
+    for index, device in enumerate(devices, start=1):
+        device_type = device.type
+        type_name = DEVICE_TYPE_LABELS.get(device_type, "unknown")
+        line = f"{index}. {device.bus_id} — type {device_type or '?'} ({type_name})"
+        name = _safe_device_name(device.name)
+        if name:
+            line += f" — {name}"
+        if device.maxpos is not None:
+            line += f" — maxpos {device.maxpos}"
+        lines.append(line)
+    return "\n".join(lines) or "—"
 
 
 class ScsGateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -126,7 +167,8 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self) -> None:
         self._pending: dict[str, Any] = {}
-        self._census_devices: list[Any] = []
+        self._census_devices: list[GatewayDevice] = []
+        self._census_focus = "all"
         self._census_active = False
         self._census_cleanup_task: asyncio.Task[None] | None = None
 
@@ -241,7 +283,13 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         return self.async_show_menu(
             step_id="devices",
-            menu_options=["device_query", "device_add", "device_edit"],
+            menu_options=[
+                "device_query",
+                "discover_devices",
+                "discover_covers",
+                "device_add",
+                "device_edit",
+            ],
         )
 
     async def async_step_device_query(
@@ -249,9 +297,13 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         if user_input is not None:
             try:
-                await self._client.async_query_devices()
-                return self._finish()
-            except GatewayConnectionError:
+                self._census_devices = await self._client.async_query_devices()
+                return await self.async_step_device_query_results()
+            except (
+                GatewayConnectionError,
+                GatewayResponseError,
+                GatewayValidationError,
+            ):
                 return self.async_show_form(
                     step_id="device_query",
                     data_schema=vol.Schema({}),
@@ -260,6 +312,25 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="device_query",
             data_schema=vol.Schema({vol.Required("query", default=True): bool}),
+        )
+
+    async def async_step_device_query_results(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Present one visible entry per device instead of discarding the query."""
+        if user_input is not None:
+            return self._finish()
+        cover_count = sum(
+            device.type in COVER_DEVICE_TYPES for device in self._census_devices
+        )
+        return self.async_show_form(
+            step_id="device_query_results",
+            data_schema=vol.Schema({vol.Required("done", default=True): bool}),
+            description_placeholders={
+                "count": str(len(self._census_devices)),
+                "cover_count": str(cover_count),
+                "devices": _format_device_lines(self._census_devices),
+            },
         )
 
     def _device_schema(self) -> vol.Schema:
@@ -317,7 +388,8 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="census",
             menu_options=[
-                "census_prepare",
+                "discover_devices",
+                "discover_covers",
                 "census_recovery_stop",
                 "census_resend",
             ],
@@ -354,9 +426,14 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             ),
         )
 
-    async def async_step_census_prepare(
-        self, user_input: dict[str, Any] | None = None
+    async def _async_prepare_census(
+        self,
+        step_id: str,
+        focus: str,
+        user_input: dict[str, Any] | None,
     ) -> FlowResult:
+        """Prepare the one real firmware census with an explicit UI focus."""
+        self._census_focus = focus
         if user_input is not None:
             if self._census_active:
                 return self._census_recovery_error("census_recovery_required")
@@ -368,7 +445,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                 )
             except (GatewayConnectionError, GatewayResponseError):
                 return self.async_show_form(
-                    step_id="census_prepare",
+                    step_id=step_id,
                     data_schema=vol.Schema(
                         {vol.Required("confirm", default=False): vol.In([True])}
                     ),
@@ -378,11 +455,28 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             self._schedule_census_cleanup()
             return await self.async_step_census_start()
         return self.async_show_form(
-            step_id="census_prepare",
+            step_id=step_id,
             data_schema=vol.Schema(
                 {vol.Required("confirm", default=False): vol.In([True])}
             ),
         )
+
+    async def async_step_discover_devices(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Expose the firmware's global discovery as a visible guided action."""
+        return await self._async_prepare_census("discover_devices", "all", user_input)
+
+    async def async_step_discover_covers(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Guide a global census with additional cover-specific instructions."""
+        return await self._async_prepare_census("discover_covers", "covers", user_input)
+
+    async def async_step_census_prepare(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        return await self._async_prepare_census("census_prepare", "all", user_input)
 
     async def async_step_census_start(
         self, user_input: dict[str, Any] | None = None
@@ -502,24 +596,17 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             if action == "scan_again":
                 if not await self._stop_census_best_effort():
                     return self._census_recovery_error()
-                return await self.async_step_census_prepare()
+                if self._census_focus == "covers":
+                    return await self.async_step_discover_covers()
+                return await self.async_step_discover_devices()
             if action == "add_manual":
                 if not await self._stop_census_best_effort():
                     return self._census_recovery_error()
                 return await self.async_step_device_add()
             return await self.async_step_census_stop({"confirm": True})
-        device_lines = "\n".join(
-            f"- {device.bus_id}: type {device.type or '?'}"
-            + (
-                " - "
-                + "".join(char for char in str(device.name) if char.isprintable())[:64]
-                if device.name
-                else ""
-            )
-            for device in self._census_devices
+        cover_count = sum(
+            device.type in COVER_DEVICE_TYPES for device in self._census_devices
         )
-        if not device_lines:
-            device_lines = "No devices detected"
         return self.async_show_form(
             step_id="census_review",
             data_schema=vol.Schema(
@@ -531,7 +618,8 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             ),
             description_placeholders={
                 "count": str(len(self._census_devices)),
-                "devices": device_lines,
+                "cover_count": str(cover_count),
+                "devices": _format_device_lines(self._census_devices),
             },
         )
 
@@ -822,6 +910,13 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     CONF_PROTOCOL_DEBUG: user_input[CONF_PROTOCOL_DEBUG],
                     CONF_BUS_MONITOR: user_input[CONF_BUS_MONITOR],
                     CONF_BUS_MONITOR_LIMIT: user_input[CONF_BUS_MONITOR_LIMIT],
+                    CONF_ADVANCED_TCP_DEBUG: user_input[CONF_ADVANCED_TCP_DEBUG],
+                    CONF_ADVANCED_TCP_DEBUG_LIMIT: user_input[
+                        CONF_ADVANCED_TCP_DEBUG_LIMIT
+                    ],
+                    CONF_ADVANCED_TCP_DEBUG_DURATION: user_input[
+                        CONF_ADVANCED_TCP_DEBUG_DURATION
+                    ],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 },
             )
@@ -855,6 +950,26 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                             CONF_BUS_MONITOR_LIMIT, DEFAULT_BUS_MONITOR_LIMIT
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=10, max=500)),
+                    vol.Required(
+                        CONF_ADVANCED_TCP_DEBUG,
+                        default=self.config_entry.options.get(
+                            CONF_ADVANCED_TCP_DEBUG, False
+                        ),
+                    ): bool,
+                    vol.Required(
+                        CONF_ADVANCED_TCP_DEBUG_LIMIT,
+                        default=self.config_entry.options.get(
+                            CONF_ADVANCED_TCP_DEBUG_LIMIT,
+                            DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=50, max=1000)),
+                    vol.Required(
+                        CONF_ADVANCED_TCP_DEBUG_DURATION,
+                        default=self.config_entry.options.get(
+                            CONF_ADVANCED_TCP_DEBUG_DURATION,
+                            DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
                 }
             ),
         )

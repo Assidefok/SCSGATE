@@ -93,10 +93,33 @@ same broker. Stock firmware 7.004 compiles its raw
 UART `SCSLOG` publisher out; on that build the viewer shows interpreted MQTT
 activity, not every electrical bus telegram.
 
-The guided census now waits for the PIC import, parses the firmware's real HTML
-device table, displays every learned address and type, and asks you to accept,
-scan again, or add a missing device manually. This is especially useful for
-lights and dimmers that were not inferred during the physical activation step.
+**View device table** now returns `N` numbered entries with address, type, name,
+and percentage-cover calibration when available. **Discover devices** runs the
+complete guided census. **Discover covers** uses the same firmware census but
+adds explicit UP/STOP/DOWN guidance and reports the number of covers separately.
+Firmware 7.004 has no safe cover-only discovery route, so both actions always
+show the complete learned table before it is accepted.
+
+### Advanced TCP/PIC capture
+
+For firmware 7.004 low-level diagnosis, enable **Advanced TCP/PIC debug** under
+**Configure > Advanced**. This feature is disabled by default. It temporarily
+uses the gateway's only unauthenticated TCP client on port 5045, switches the
+PIC log to ASCII/full-frame mode, retains a bounded in-memory capture, and
+automatically restores the stock `@MX`, `@Y1`, `@F3`, `@l` settings.
+
+Start it from **Developer Tools > Actions** with
+`scsgate.start_advanced_debug` and confirmation `DEBUG <gateway identifier>`.
+Use `scsgate.stop_advanced_debug` to stop early,
+`scsgate.export_advanced_debug` to view the volatile messages, and
+`scsgate.clear_advanced_debug` to erase them. If the connection is interrupted,
+the diagnostic sensor reports `restore_required`; run
+`scsgate.recover_advanced_debug` with `RECOVER <gateway identifier>`.
+
+The capture can expose device addresses and occupancy. Use it only on a trusted
+LAN, never expose port 5045 to the Internet, and do not run another TCP client
+at the same time. It is a read-only fixed workflow, not a TCP terminal and not
+an SCS transmit service.
 
 ## Development
 

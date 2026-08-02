@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Show device-table queries as `N` numbered entries with type, name and cover
+  calibration, and add separate guided actions for device and cover discovery.
+- Add opt-in advanced TCP/PIC debug on the fixed LAN port 5045, with one bounded
+  temporary session, automatic stock-setting restoration, explicit recovery,
+  volatile export, safe aggregate diagnostics, and no generic TCP terminal.
+
 ## 0.2.0
 
 - Add a complete Italian translation while keeping English as the default.
