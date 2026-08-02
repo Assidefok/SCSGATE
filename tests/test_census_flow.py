@@ -1,10 +1,17 @@
 """Guided census flow presentation tests."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
-from custom_components.scsgate.config_flow import ScsGateOptionsFlow
+from custom_components.scsgate.config_flow import ScsGateConfigFlow, ScsGateOptionsFlow
 from custom_components.scsgate.models import GatewayDevice
+
+
+def test_options_flow_factory_does_not_assign_managed_config_entry() -> None:
+    """Home Assistant owns OptionsFlow.config_entry on current releases."""
+    flow = ScsGateConfigFlow.async_get_options_flow(SimpleNamespace())
+
+    assert isinstance(flow, ScsGateOptionsFlow)
 
 
 async def test_device_query_returns_one_visible_line_per_device(monkeypatch) -> None:
@@ -52,6 +59,22 @@ async def test_cover_discovery_prepares_real_global_census(monkeypatch) -> None:
     assert flow._census_focus == "covers"
     assert flow._census_active is True
     client.async_mqtt_devices.assert_awaited_once_with("prepare")
+
+
+async def test_accepting_census_stops_before_resending_discovery(
+    monkeypatch,
+) -> None:
+    client = SimpleNamespace(async_mqtt_devices=AsyncMock(return_value=[]))
+    monkeypatch.setattr(ScsGateOptionsFlow, "_client", property(lambda _flow: client))
+    flow = ScsGateOptionsFlow()
+    finish = Mock(return_value={"type": "create_entry"})
+    monkeypatch.setattr(flow, "_finish", finish)
+
+    result = await flow.async_step_census_stop({"confirm": True})
+
+    assert result == {"type": "create_entry"}
+    assert client.async_mqtt_devices.await_args_list == [call("stop"), call("resend")]
+    finish.assert_called_once()
 
 
 async def test_census_review_shows_every_detected_type() -> None:

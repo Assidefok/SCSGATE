@@ -7,9 +7,6 @@
 - Add opt-in advanced TCP/PIC debug on the fixed LAN port 5045, with one bounded
   temporary session, automatic stock-setting restoration, explicit recovery,
   volatile export, safe aggregate diagnostics, and no generic TCP terminal.
-
-## 0.2.0
-
 - Add a complete Italian translation while keeping English as the default.
 - Add an opt-in, bounded MQTT bus activity monitor for `scs/#`, `SCSERROR`,
   and optional custom-firmware `SCSLOG` traffic.
@@ -19,9 +16,6 @@
 - Make the guided census poll the asynchronous PIC import, parse the real 7.004
   device-list HTML, and ask users to accept, rescan, or add missing devices.
 - Cap callbacks at the firmware EEPROM-safe maximum of 97 characters.
-
-## 0.1.3
-
 - Add secret-free operation IDs, HTTP timing/status metrics, parser counts,
   census progress, maintenance logging, and redacted transport diagnostics.
 - Add opt-in, bounded, in-memory protocol analysis for every HTTP response,
