@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import inspect
+import logging
+from itertools import count
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
@@ -12,6 +14,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import ScsGateCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+_BUTTON_OPERATION_COUNTER = count(1)
 
 DESCRIPTIONS = (
     ButtonEntityDescription(key="refresh", name="Refresh status", icon="mdi:refresh"),
@@ -55,20 +60,45 @@ class ScsGateButton(CoordinatorEntity[ScsGateCoordinator], ButtonEntity):
 
     async def async_press(self) -> None:
         key = self.entity_description.key
-        if key == "refresh":
-            await self.coordinator.async_request_refresh()
-            return
+        operation_id = f"button-{next(_BUTTON_OPERATION_COUNTER):06d}"
+        _LOGGER.debug(
+            "Maintenance button started operation_id=%s action=%s",
+            operation_id,
+            key,
+        )
         try:
-            if key == "query_devices":
-                result = self.coordinator.client.async_query_devices()
-            elif key == "resend_discovery":
-                result = self.coordinator.client.async_mqtt_devices("resend")
+            if key == "refresh":
+                await self.coordinator.async_request_refresh()
             else:
-                result = self.coordinator.client.async_reset("mqtt")
+                if key == "query_devices":
+                    result = self.coordinator.client.async_query_devices()
+                elif key == "resend_discovery":
+                    result = self.coordinator.client.async_mqtt_devices("resend")
+                else:
+                    result = self.coordinator.client.async_reset("mqtt")
+                if inspect.isawaitable(result):
+                    await result
+                await self.coordinator.async_request_refresh()
         except AttributeError as err:
+            _LOGGER.debug(
+                "Maintenance button failed operation_id=%s action=%s error_type=%s",
+                operation_id,
+                key,
+                type(err).__name__,
+            )
             raise HomeAssistantError(
                 "Gateway firmware does not support this action"
             ) from err
-        if inspect.isawaitable(result):
-            await result
-        await self.coordinator.async_request_refresh()
+        except Exception as err:
+            _LOGGER.debug(
+                "Maintenance button failed operation_id=%s action=%s error_type=%s",
+                operation_id,
+                key,
+                type(err).__name__,
+            )
+            raise
+        _LOGGER.debug(
+            "Maintenance button completed operation_id=%s action=%s",
+            operation_id,
+            key,
+        )

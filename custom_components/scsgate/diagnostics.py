@@ -11,7 +11,20 @@ from homeassistant.helpers.redact import async_redact_data
 
 from .const import DOMAIN
 
-_REDACT = {"password", "pass", "ssid", "username", "broker", "url", "host", "token"}
+_REDACT = {
+    "password",
+    "pass",
+    "ssid",
+    "wifi_ssid",
+    "username",
+    "broker",
+    "mqtt_broker",
+    "url",
+    "callback",
+    "host",
+    "mac",
+    "token",
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -28,6 +41,13 @@ async def async_get_config_entry_diagnostics(
     options = dict(entry.options)
     if "last_device_snapshot" in options:
         options["last_device_snapshot"] = "[redacted]"
+    transport = getattr(getattr(runtime, "client", None), "debug_metrics", {})
     return async_redact_data(
-        {"entry": dict(entry.data), "options": options, "status": status}, _REDACT
+        {
+            "entry": dict(entry.data),
+            "options": options,
+            "status": status,
+            "transport": transport,
+        },
+        _REDACT,
     )

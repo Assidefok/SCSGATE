@@ -22,19 +22,14 @@ setup, diagnostics, device census, and guarded HTTP administration.
 
 ## Install and configure
 
-This repository is private. HACS supports public GitHub repositories only, so
-install this version manually:
+This repository is public and passes the official HACS validation. In HACS,
+open **Custom repositories**, add `https://github.com/Assidefok/SCSGATE` as an
+**Integration**, install SCSGATE, and restart Home Assistant. Then go to
+**Settings > Devices & services > Add integration**, select **SCSGATE**, and
+enter the gateway's private LAN IP address and HTTP port.
 
-1. Copy `custom_components/scsgate` into your Home Assistant configuration
-   directory as `custom_components/scsgate`.
-2. Restart Home Assistant.
-3. Go to **Settings → Devices & services → Add integration**, choose
-   **SCSGATE**, and enter the gateway's private LAN IP address and HTTP port.
-
-When the repository becomes public, add it in HACS as a custom **Integration**
-repository, install it, restart Home Assistant, then use the same setup flow.
-See [installation notes](docs/installation.md) for upgrade and troubleshooting
-guidance.
+See the [installation and troubleshooting guide](docs/installation.md) for
+manual installation, upgrades, recovery, and safe debug logging.
 
 ## Safety model
 
@@ -48,6 +43,29 @@ guidance.
 See [HTTP API coverage](docs/http-api.md) for the firmware route matrix and
 [the primary sources](docs/research/scsgate-primary-sources.md) for the
 firmware/manual versions used by this integration.
+
+## Diagnostics and safe debug logging
+
+Download a redacted diagnostic file from **Settings > Devices & services >
+SCSGATE > Download diagnostics**. It excludes the gateway address and MAC,
+Wi-Fi SSID, broker details, callbacks, credentials, and device snapshots while
+including secret-free HTTP counters and the last operation result.
+
+For temporary debug logging, add this to `configuration.yaml` and restart Home
+Assistant:
+
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.scsgate: debug
+```
+
+Debug messages include operation IDs, endpoint paths, HTTP status, duration,
+response length, parser counts, census progress, and maintenance actions. They
+never include hosts, query strings, response bodies, device names, callbacks,
+SSIDs, broker addresses, usernames, or passwords. Remove the override after
+troubleshooting to reduce log volume.
 
 ## Development
 

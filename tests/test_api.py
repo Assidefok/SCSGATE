@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -132,6 +133,65 @@ async def test_http_errors_do_not_include_sensitive_query_values(
 
     assert secret not in str(error.value)
     assert "mqttcfg" in str(error.value)
+
+
+async def test_debug_log_and_metrics_never_retain_request_values(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    secret = "unique-debug-password"
+    broker = "192.168.44.99"
+    response_body = "private gateway response"
+    session = FakeSession(FakeResponse(body=response_body))
+    gateway = GatewayClient(session, "192.168.44.20")  # type: ignore[arg-type]
+    monkeypatch.setattr(gateway, "async_validate_host", _bypass_host_validation)
+    caplog.set_level(logging.DEBUG, logger="custom_components.scsgate.api")
+
+    await gateway.async_configure_mqtt(
+        broker=broker,
+        port=1883,
+        username="private-user",
+        password=secret,
+    )
+
+    log_text = caplog.text
+    assert "operation_id=http-000001" in log_text
+    assert "endpoint=/mqttcfg" in log_text
+    assert "status=200" in log_text
+    assert secret not in log_text
+    assert broker not in log_text
+    assert "private-user" not in log_text
+    assert response_body not in log_text
+    assert "192.168.44.20" not in log_text
+    assert gateway.debug_metrics == {
+        "requests_total": 1,
+        "failures_total": 0,
+        "last_operation_id": "http-000001",
+        "last_endpoint": "/mqttcfg",
+        "last_status": 200,
+        "last_duration_ms": gateway.debug_metrics["last_duration_ms"],
+        "last_response_chars": len(response_body),
+    }
+
+
+async def test_failed_request_updates_secret_free_metrics(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    secret = "transport-error-secret"
+    session = FakeSession(aiohttp.ClientError(secret))
+    gateway = GatewayClient(session, "192.168.44.20")  # type: ignore[arg-type]
+    monkeypatch.setattr(gateway, "async_validate_host", _bypass_host_validation)
+    caplog.set_level(logging.DEBUG, logger="custom_components.scsgate.api")
+
+    with pytest.raises(GatewayConnectionError):
+        await gateway.async_configure_mqtt(
+            broker="192.168.44.99", port=1883, password=secret
+        )
+
+    assert secret not in caplog.text
+    assert gateway.debug_metrics["requests_total"] == 1
+    assert gateway.debug_metrics["failures_total"] == 1
+    assert gateway.debug_metrics["last_status"] is None
+    assert gateway.debug_metrics["last_response_chars"] is None
 
 
 @pytest.mark.parametrize("host", ["8.8.8.8", "1.1.1.1", "2001:4860:4860::8888"])
