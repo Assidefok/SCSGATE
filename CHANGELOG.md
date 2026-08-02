@@ -2,6 +2,7 @@
 
 ## 0.2.0
 
+- Add a complete Italian translation while keeping English as the default.
 - Add an opt-in, bounded MQTT bus activity monitor for `scs/#`, `SCSERROR`,
   and optional custom-firmware `SCSLOG` traffic.
 - Add confirmed on-demand structured log export and volatile-log clearing.

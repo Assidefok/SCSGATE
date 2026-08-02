@@ -1,0 +1,54 @@
+{
+  "title": "SCSGATE",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connetti SCSGATE",
+        "description": "Inserisci l'indirizzo IP privato/locale del gateway.",
+        "data": {"host": "Indirizzo IP", "port": "Porta HTTP"}
+      }
+    },
+    "error": {
+      "private_host_required": "Usa un indirizzo IP letterale privato o locale.",
+      "cannot_connect": "Impossibile connettersi al gateway.",
+      "invalid_status": "Il gateway ha restituito una pagina di stato non valida.",
+      "unsupported_firmware": "Firmware non supportato."
+    },
+    "abort": {"already_configured": "Questo gateway è già configurato."}
+  },
+  "options": {
+    "step": {
+      "init": {"menu_options": {"status": "Stato", "devices": "Dispositivi", "census": "Censimento guidato", "mqtt": "MQTT", "network": "Rete", "callback": "Callback", "maintenance": "Manutenzione", "danger": "Zona pericolosa", "advanced": "Avanzate"}},
+      "status": {"title": "Stato del gateway", "description": "Aggiorna la diagnostica. Gli strumenti web /test, /request e /help restano disponibili sul gateway.", "data": {"refresh": "Aggiorna ora"}},
+      "devices": {"menu_options": {"device_query": "Consulta la tabella dispositivi", "device_add": "Aggiungi dispositivo", "device_edit": "Modifica dispositivo"}},
+      "device_query": {"title": "Consulta dispositivi", "data": {"query": "Consulta ora"}},
+      "device_add": {"title": "Aggiungi dispositivo", "description": "Usa l'indirizzo bus esadecimale a due cifre. Tipi: 1 interruttore/luce, 3 o 4 dimmer, 8 o 18 tapparella, 9 o 19 tapparella percentuale, 11 generico, 14 allarme.", "data": {"busid": "ID bus SCS", "type": "Tipo di dispositivo", "devname": "Nome", "maxpos": "Posizione/tempo massimo", "resend": "Ripubblica MQTT Discovery"}},
+      "device_edit": {"title": "Modifica dispositivo", "data": {"busid": "ID bus SCS", "type": "Tipo di dispositivo", "devname": "Nome", "maxpos": "Posizione/tempo massimo", "resend": "Ripubblica MQTT Discovery"}},
+      "census": {"menu_options": {"census_prepare": "Avvia censimento guidato", "census_recovery_stop": "Arresta un censimento abbandonato", "census_resend": "Ripubblica Discovery"}},
+      "census_prepare": {"title": "Prepara il censimento", "description": "Dopo la conferma, aziona ogni dispositivo SCS prima di avviare l'importazione.", "data": {"confirm": "Ho capito"}},
+      "census_start": {"title": "Avvia importazione dispositivi", "description": "Conferma solo dopo che ogni dispositivo ha generato traffico sul bus.", "data": {"confirm": "Avvia"}},
+      "census_query": {"title": "Consulta il censimento", "data": {"confirm": "Consulta"}},
+      "census_review": {"title": "Conferma i dispositivi rilevati", "description": "Il gateway ha segnalato {count} dispositivi:\n\n{devices}\n\nAccettali, ripeti la scansione oppure aggiungi manualmente un dispositivo mancante.", "data": {"action": "Azione successiva"}},
+      "census_stop": {"title": "Arresta censimento", "data": {"confirm": "Arresta"}},
+      "census_recovery_stop": {"title": "Arresta censimento abbandonato", "description": "Usa questa funzione di ripristino se un precedente censimento guidato è stato chiuso prima del completamento.", "data": {"confirm": "Arresta ora"}},
+      "census_resend": {"title": "Ripubblica MQTT Discovery", "data": {"confirm": "Ripubblica"}},
+      "mqtt": {"title": "Configura MQTT del gateway", "description": "Le credenziali vengono inviate una sola volta tramite HTTP GET non cifrato e non vengono mai memorizzate da Home Assistant.", "data": {"broker": "IP del broker", "port": "Porta", "username": "Nome utente", "password": "Password", "domain": "Modalità", "discovery_options": "Opzioni Discovery", "log": "Log MQTT", "persistent": "Messaggi mantenuti", "alexa": "Modalità Alexa"}},
+      "network": {"title": "Configura la rete del gateway", "description": "La modifica del Wi-Fi può rendere il gateway irraggiungibile. Inserisci il suo identificatore attuale per confermare.", "data": {"ssid": "SSID", "password": "Password Wi-Fi", "ip": "IP del gateway", "gateway": "IP del router", "udp_port": "Porta UDP", "confirm_mac": "Identificatore attuale del gateway"}},
+      "callback": {"title": "Configura callback HTTP", "description": "Il callback rimane nella EEPROM del gateway e viene inviato senza TLS. Query e frammenti vengono rifiutati. Digita CALLBACK seguito dall'identificatore del gateway.", "data": {"callback": "URL privato del callback o percorso del firmware", "confirm_mac": "CALLBACK identificatore del gateway"}},
+      "maintenance": {"menu_options": {"reset_mqtt": "Riconnetti MQTT", "reset_advanced": "Riavvia processore", "picprog_test": "Verifica programmazione PIC", "picprog_flash": "Programma firmware PIC"}},
+      "reset_mqtt": {"title": "Riconnetti MQTT", "data": {"confirm": "Riconnetti"}},
+      "reset_advanced": {"title": "Riavvia processore", "data": {"device": "Destinazione", "confirm_mac": "Identificatore attuale del gateway"}},
+      "picprog_test": {"title": "Verifica programmazione PIC", "data": {"confirm": "Esegui verifica"}},
+      "picprog_flash": {"title": "Programma firmware PIC", "description": "Operazione ad alto rischio. Digita FLASH seguito dall'identificatore del gateway.", "data": {"confirm": "Frase di conferma"}},
+      "danger": {"title": "Cancella dispositivi appresi", "description": "Questa operazione cancella la tabella dei dispositivi appresi. Digita CLEAR seguito dall'identificatore del gateway.", "data": {"confirm": "Frase di conferma"}},
+      "advanced": {"title": "Opzioni avanzate", "description": "Il monitor esteso all'intero broker conserva un registro volatile e limitato dell'attività MQTT. I messaggi possono rivelare indirizzi e occupazione. Il firmware standard 7.004 pubblica topic scs/... interpretati; il flusso UART grezzo SCSLOG richiede un firmware compilato con MQTTLOG.", "data": {"enable_raw_commands": "Abilita servizio SCS grezzo", "enable_protocol_debug": "Abilita analisi sicura del protocollo HTTP", "scan_interval": "Intervallo di stato (secondi)", "enable_bus_monitor": "Abilita monitor attività esteso all'intero broker", "bus_monitor_limit": "Messaggi conservati in memoria"}}
+    },
+    "error": {
+      "cannot_connect": "Impossibile connettersi al gateway.",
+      "confirmation_required": "La conferma non corrisponde.",
+      "invalid_callback": "Callback privato non valido.",
+      "census_still_running": "L'importazione PIC ha superato il tempo massimo ed è stata arrestata in sicurezza. Avvia nuovamente il censimento guidato.",
+      "census_recovery_required": "Un censimento precedente potrebbe essere ancora attivo. Arresta il censimento abbandonato prima di avviarne un altro."
+    }
+  }
+}

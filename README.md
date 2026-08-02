@@ -22,6 +22,9 @@ setup, diagnostics, device census, and guarded HTTP administration.
 
 ## Install and configure
 
+The integration UI is available in English (default), Catalan, Spanish, and
+Italian.
+
 This repository is public and passes the official HACS validation. In HACS,
 open **Custom repositories**, add `https://github.com/Assidefok/SCSGATE` as an
 **Integration**, install SCSGATE, and restart Home Assistant. Then go to

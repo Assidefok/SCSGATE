@@ -14,7 +14,8 @@
 
 - Add or update a redacted fixture and tests for every parser or firmware route.
 - Update `docs/http-api.md` when endpoint behavior or risk changes.
-- Update English, Catalan, and Spanish strings for every user-visible flow.
+- Keep English as the source/default language and update Catalan, Spanish, and
+  Italian strings for every user-visible flow.
 - Run Ruff, compileall, pytest, Hassfest, and HACS validation before release.
 - Never commit real gateway captures, diagnostics, credentials, MAC/IP addresses,
   SSIDs, callback URLs, broker details, or Home Assistant `.storage` data.
