@@ -2,6 +2,8 @@
 
 ## 0.2.0
 
+- Show device-table queries as `N` numbered entries with type, name and cover
+  calibration, and add separate guided actions for device and cover discovery.
 - Add a complete Italian translation while keeping English as the default.
 - Add an opt-in, bounded MQTT bus activity monitor for `scs/#`, `SCSERROR`,
   and optional custom-firmware `SCSLOG` traffic.

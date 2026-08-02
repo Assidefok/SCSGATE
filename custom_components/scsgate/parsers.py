@@ -162,11 +162,25 @@ def parse_devices(body: str) -> list[GatewayDevice]:
                     "cover u": 18,
                     "coverpct u": 19,
                 }
+                device_type = type_by_label[label]
+                name = firmware_row.group(3).strip() or None
+                maxpos = None
+                if device_type in {9, 19} and name:
+                    calibration = re.match(
+                        r"^([0-9A-Fa-f]{4})\s+[0-9A-Fa-f]{4}\s+"
+                        r"[0-9A-Fa-f]{2}\s+[0-9A-Fa-f]{4}\s+"
+                        r"[0-9A-Fa-f]{2}(?:\s+(.*))?$",
+                        name,
+                    )
+                    if calibration:
+                        maxpos = int(calibration.group(1), 16)
+                        name = (calibration.group(2) or "").strip() or None
                 devices.append(
                     GatewayDevice(
                         bus_id=firmware_row.group(1).upper(),
-                        type=type_by_label[label],
-                        name=firmware_row.group(3).strip() or None,
+                        type=device_type,
+                        name=name,
+                        maxpos=maxpos,
                     )
                 )
                 continue

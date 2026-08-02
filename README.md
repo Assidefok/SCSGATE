@@ -93,10 +93,12 @@ same broker. Stock firmware 7.004 compiles its raw
 UART `SCSLOG` publisher out; on that build the viewer shows interpreted MQTT
 activity, not every electrical bus telegram.
 
-The guided census now waits for the PIC import, parses the firmware's real HTML
-device table, displays every learned address and type, and asks you to accept,
-scan again, or add a missing device manually. This is especially useful for
-lights and dimmers that were not inferred during the physical activation step.
+**View device table** now returns `N` numbered entries with address, type, name,
+and percentage-cover calibration when available. **Discover devices** runs the
+complete guided census. **Discover covers** uses the same firmware census but
+adds explicit UP/STOP/DOWN guidance and reports the number of covers separately.
+Firmware 7.004 has no safe cover-only discovery route, so both actions always
+show the complete learned table before it is accepted.
 
 ## Development
 

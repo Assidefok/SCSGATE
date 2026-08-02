@@ -110,10 +110,13 @@ buffer.
 
 ### Guided device learning
 
-Choose **Configure > Guided census > Prepare census**, then physically operate
-each required SCS device. Starting the import transfers the PIC's learned table
-to the ESP. SCSGATE polls without blocking Home Assistant, then shows the exact
-addresses and inferred types. Accept the list, repeat the scan, or choose the
-manual-add path for a missing light, dimmer, cover, generic device, or alarm.
+Choose **Configure > Devices > Discover devices**, then physically operate each
+required SCS device. For focused guidance choose **Discover covers**, operate
+every device because firmware rebuilds one global table, and exercise
+UP/STOP/DOWN on every cover. Starting the import transfers the PIC's learned
+table to the ESP. SCSGATE polls without blocking Home Assistant, then shows `N`
+numbered entries with exact addresses, inferred types, names and available
+cover calibration. Accept the list, repeat the scan, or choose the manual-add
+path for a missing light, dimmer, cover, generic device, or alarm.
 If the browser flow is abandoned, a best-effort cleanup stops PIC learning
 after ten minutes; **Stop an abandoned census** is also available immediately.
