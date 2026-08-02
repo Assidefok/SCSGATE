@@ -143,6 +143,34 @@ def parse_devices(body: str) -> list[GatewayDevice]:
         }
         bus_id = pairs.get("busid") or pairs.get("bus_id") or pairs.get("id")
         if not bus_id:
+            firmware_row = re.match(
+                r"^\s*([0-9A-Fa-f]{2})\s*"
+                r"(coverpct\s+U|cover\s+U|alarm\s+board|coverpct|switch|dimmer|cover|generic)\b"
+                r"(.*)$",
+                record,
+                re.I,
+            )
+            if firmware_row:
+                label = re.sub(r"\s+", " ", firmware_row.group(2).lower())
+                type_by_label = {
+                    "switch": 1,
+                    "dimmer": 3,
+                    "cover": 8,
+                    "coverpct": 9,
+                    "generic": 11,
+                    "alarm board": 14,
+                    "cover u": 18,
+                    "coverpct u": 19,
+                }
+                devices.append(
+                    GatewayDevice(
+                        bus_id=firmware_row.group(1).upper(),
+                        type=type_by_label[label],
+                        name=firmware_row.group(3).strip() or None,
+                    )
+                )
+                continue
+        if not bus_id:
             if record.strip():
                 ignored_records += 1
             continue

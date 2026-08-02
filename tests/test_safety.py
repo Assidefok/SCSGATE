@@ -8,21 +8,25 @@ from unittest.mock import AsyncMock
 
 import pytest
 import voluptuous as vol
+from homeassistant.components.mqtt.models import ReceiveMessage
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.scsgate import ScsGateRuntimeData, _async_register_services
+from custom_components.scsgate.bus_monitor import BusMonitor
 from custom_components.scsgate.config_flow import ScsGateOptionsFlow, _is_private_host
 from custom_components.scsgate.const import (
     ATTR_CMD,
     ATTR_CONFIRM,
     ATTR_ENTRY_ID,
     ATTR_FROM,
+    ATTR_LIMIT,
     ATTR_RESPONSE,
     ATTR_TO,
     ATTR_TYPE,
     CONF_ENABLE_RAW_COMMANDS,
     DOMAIN,
+    SERVICE_EXPORT_BUS_LOG,
     SERVICE_SEND_RAW_TELEGRAM,
 )
 from custom_components.scsgate.coordinator import ScsGateCoordinator
@@ -201,3 +205,37 @@ async def test_raw_service_forwards_valid_confirmed_command(hass) -> None:
     )
 
     client.async_send_raw_telegram.assert_awaited_once_with("1", "A", "2", "F", "none")
+
+
+async def test_bus_log_export_requires_confirmation_and_returns_response(hass) -> None:
+    monitor = BusMonitor(hass, enabled=True)
+    monitor._async_message_received(
+        ReceiveMessage("scs/switch/state/24", "ON", 0, False, "scs/#", 0.0)
+    )
+    coordinator = SimpleNamespace(config_entry=SimpleNamespace(options={}))
+    hass.data[DOMAIN] = {
+        "entry": ScsGateRuntimeData(
+            client=SimpleNamespace(), coordinator=coordinator, bus_monitor=monitor
+        )
+    }
+    _async_register_services(hass)
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_EXPORT_BUS_LOG,
+            {ATTR_ENTRY_ID: "entry", ATTR_LIMIT: 10, ATTR_CONFIRM: False},
+            blocking=True,
+            return_response=True,
+        )
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_EXPORT_BUS_LOG,
+        {ATTR_ENTRY_ID: "entry", ATTR_LIMIT: 10, ATTR_CONFIRM: True},
+        blocking=True,
+        return_response=True,
+    )
+
+    assert response["messages"][0]["topic"] == "scs/switch/state/24"
+    assert response["scope"].startswith("Home Assistant MQTT broker")

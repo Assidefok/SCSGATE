@@ -61,10 +61,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up status sensors."""
     coordinator: ScsGateCoordinator = entry.runtime_data.coordinator
-    async_add_entities(
+    entities: list[SensorEntity] = [
         ScsGateSensor(coordinator, description, getter)
         for description, getter in DESCRIPTIONS
-    )
+    ]
+    monitor = getattr(entry.runtime_data, "bus_monitor", None)
+    if monitor is not None:
+        entities.append(ScsGateBusMonitorSensor(coordinator, monitor))
+    async_add_entities(entities)
 
 
 class ScsGateSensor(CoordinatorEntity[ScsGateCoordinator], SensorEntity):
@@ -90,3 +94,41 @@ class ScsGateSensor(CoordinatorEntity[ScsGateCoordinator], SensorEntity):
     @property
     def native_value(self) -> Any:
         return self._getter(self.coordinator.data) if self.coordinator.data else None
+
+
+class ScsGateBusMonitorSensor(SensorEntity):
+    """Expose safe monitor counts; raw content stays out of entity state/history."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Broker bus monitor"
+    _attr_icon = "mdi:message-text-fast-outline"
+    _attr_native_unit_of_measurement = "messages"
+
+    def __init__(self, coordinator: ScsGateCoordinator, monitor: Any) -> None:
+        self._monitor = monitor
+        entry_key = (
+            coordinator.config_entry.unique_id or coordinator.config_entry.entry_id
+        )
+        self._attr_unique_id = f"{entry_key}_bus_monitor"
+        self._attr_device_info = coordinator.device_info
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._monitor.async_add_listener(self.async_write_ha_state)
+        )
+
+    @property
+    def native_value(self) -> int:
+        return self._monitor.retained_count
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        diagnostics = self._monitor.diagnostics
+        return {
+            "enabled": diagnostics["enabled"],
+            "raw_uart_seen": diagnostics["raw_uart_seen"],
+            "received_total": diagnostics["received_total"],
+            "discarded_total": diagnostics["discarded_total"],
+            "last_message_at": self._monitor.last_message_at,
+        }

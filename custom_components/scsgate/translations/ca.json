@@ -8,28 +8,30 @@
   "options": {
     "step": {
       "init": {"menu_options": {"status": "Estat", "devices": "Dispositius", "census": "Cens guiat", "mqtt": "MQTT", "network": "Xarxa", "callback": "Callback", "maintenance": "Manteniment", "danger": "Zona perillosa", "advanced": "Avançat"}},
-      "status": {"title": "Estat del gateway", "data": {"refresh": "Actualitza ara"}},
+      "status": {"title": "Estat del gateway", "description": "Actualitza el diagnòstic. Les eines web /test, /request i /help continuen disponibles al gateway.", "data": {"refresh": "Actualitza ara"}},
       "devices": {"menu_options": {"device_query": "Consulta la taula", "device_add": "Afegeix dispositiu", "device_edit": "Edita dispositiu"}},
       "device_query": {"title": "Consulta dispositius", "data": {"query": "Consulta ara"}},
-      "device_add": {"title": "Afegeix dispositiu", "data": {"busid": "ID bus SCS", "type": "Tipus", "devname": "Nom", "maxpos": "Posició/temps màxim", "resend": "Republica MQTT Discovery"}},
+      "device_add": {"title": "Afegeix dispositiu", "description": "Usa l'adreça hexadecimal de dos dígits. Tipus: 1 interruptor/llum, 3 o 4 dimmer, 8 o 18 persiana, 9 o 19 persiana percentual, 11 genèric, 14 alarma.", "data": {"busid": "ID bus SCS", "type": "Tipus", "devname": "Nom", "maxpos": "Posició/temps màxim", "resend": "Republica MQTT Discovery"}},
       "device_edit": {"title": "Edita dispositiu", "data": {"busid": "ID bus SCS", "type": "Tipus", "devname": "Nom", "maxpos": "Posició/temps màxim", "resend": "Republica MQTT Discovery"}},
-      "census": {"menu_options": {"census_prepare": "Prepara cens", "census_start": "Inicia importació", "census_query": "Consulta progrés", "census_stop": "Atura cens", "census_resend": "Republica Discovery"}},
-      "census_prepare": {"title": "Prepara cens", "data": {"confirm": "Ho entenc"}},
-      "census_start": {"title": "Inicia importació", "data": {"confirm": "Inicia"}},
+      "census": {"menu_options": {"census_prepare": "Inicia cens guiat", "census_recovery_stop": "Atura un cens abandonat", "census_resend": "Republica Discovery"}},
+      "census_prepare": {"title": "Prepara cens", "description": "Després de confirmar, acciona tots els dispositius SCS abans d'iniciar la importació.", "data": {"confirm": "Ho entenc"}},
+      "census_start": {"title": "Inicia importació", "description": "Confirma només quan tots els dispositius hagin generat trànsit al bus.", "data": {"confirm": "Inicia"}},
       "census_query": {"title": "Consulta cens", "data": {"confirm": "Consulta"}},
+      "census_review": {"title": "Confirma els dispositius detectats", "description": "El gateway informa de {count} dispositius:\n\n{devices}\n\nAccepta'ls, repeteix l'escaneig o afegeix manualment el dispositiu que falti.", "data": {"action": "Acció següent"}},
       "census_stop": {"title": "Atura cens", "data": {"confirm": "Atura"}},
+      "census_recovery_stop": {"title": "Atura cens abandonat", "description": "Usa aquesta recuperació si un cens anterior es va tancar abans d'acabar.", "data": {"confirm": "Atura ara"}},
       "census_resend": {"title": "Republica MQTT Discovery", "data": {"confirm": "Republica"}},
       "mqtt": {"title": "Configura MQTT", "description": "Les credencials s'envien una sola vegada per HTTP GET sense xifrar i Home Assistant no les desa.", "data": {"broker": "IP broker", "port": "Port", "username": "Usuari", "password": "Contrasenya", "domain": "Mode", "discovery_options": "Opcions Discovery", "log": "Log MQTT", "persistent": "Missatges retinguts", "alexa": "Mode Alexa"}},
-      "network": {"title": "Configura la xarxa", "data": {"ssid": "SSID", "password": "Contrasenya Wi-Fi", "ip": "IP gateway", "gateway": "IP router", "udp_port": "Port UDP", "confirm_mac": "Identificador actual"}},
-      "callback": {"title": "Configura callback HTTP", "data": {"callback": "URL privada o ruta firmware"}},
+      "network": {"title": "Configura la xarxa", "description": "Canviar el Wi-Fi pot deixar el gateway inaccessible. Introdueix-ne l'identificador actual per confirmar.", "data": {"ssid": "SSID", "password": "Contrasenya Wi-Fi", "ip": "IP gateway", "gateway": "IP router", "udp_port": "Port UDP", "confirm_mac": "Identificador actual"}},
+      "callback": {"title": "Configura callback HTTP", "description": "El callback persisteix a l'EEPROM i s'envia sense TLS. Es rebutgen consultes i fragments. Escriu CALLBACK seguit de l'identificador del gateway.", "data": {"callback": "URL privada o ruta firmware", "confirm_mac": "CALLBACK identificador gateway"}},
       "maintenance": {"menu_options": {"reset_mqtt": "Reconnecta MQTT", "reset_advanced": "Reinicia processador", "picprog_test": "Prova programació PIC", "picprog_flash": "Programa firmware PIC"}},
       "reset_mqtt": {"title": "Reconnecta MQTT", "data": {"confirm": "Reconnecta"}},
       "reset_advanced": {"title": "Reinicia processador", "data": {"device": "Objectiu", "confirm_mac": "Identificador actual"}},
       "picprog_test": {"title": "Prova programació PIC", "data": {"confirm": "Executa prova"}},
-      "picprog_flash": {"title": "Programa firmware PIC", "data": {"confirm": "FLASH identificador"}},
-      "danger": {"title": "Esborra dispositius apresos", "data": {"confirm": "CLEAR identificador"}},
-      "advanced": {"title": "Opcions avançades", "description": "El debug de protocol analitza en memòria totes les respostes HTTP i només conserva comptadors estructurals i codis d'anomalia fixos. Mai no desa ni registra el contingut cru.", "data": {"enable_raw_commands": "Activa servei SCS cru", "enable_protocol_debug": "Activa l'anàlisi segura del protocol", "scan_interval": "Interval d'estat (segons)"}}
+      "picprog_flash": {"title": "Programa firmware PIC", "description": "Operació d'alt risc. Escriu FLASH seguit de l'identificador del gateway.", "data": {"confirm": "FLASH identificador"}},
+      "danger": {"title": "Esborra dispositius apresos", "description": "Això esborra la taula de dispositius apresos. Escriu CLEAR seguit de l'identificador del gateway.", "data": {"confirm": "CLEAR identificador"}},
+      "advanced": {"title": "Opcions avançades", "description": "El monitor de tot el broker conserva un registre MQTT limitat i volàtil. Pot revelar adreces i ocupació. El firmware 7.004 estàndard publica scs/...; l'UART cru SCSLOG requereix firmware compilat amb MQTTLOG.", "data": {"enable_raw_commands": "Activa servei SCS cru", "enable_protocol_debug": "Activa l'anàlisi HTTP segura", "scan_interval": "Interval d'estat (segons)", "enable_bus_monitor": "Activa el monitor de tot el broker", "bus_monitor_limit": "Missatges retinguts en memòria"}}
     },
-    "error": {"cannot_connect": "No es pot connectar amb el gateway.", "confirmation_required": "La confirmació no coincideix.", "invalid_callback": "Callback privat invàlid."}
+    "error": {"cannot_connect": "No es pot connectar amb el gateway.", "confirmation_required": "La confirmació no coincideix.", "invalid_callback": "Callback privat invàlid.", "census_still_running": "La importació del PIC ha expirat i s'ha aturat de manera segura. Torna a iniciar el cens guiat.", "census_recovery_required": "Un cens anterior pot continuar actiu. Atura el cens abandonat abans d'iniciar-ne un altre."}
   }
 }

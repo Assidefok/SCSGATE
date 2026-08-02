@@ -7,7 +7,8 @@ send_raw_telegram:
     entry_id:
       required: true
       selector:
-        text:
+        config_entry:
+          integration: scsgate
     type:
       required: true
       selector:
@@ -32,6 +33,45 @@ send_raw_telegram:
             - none
             - y
             - i
+    confirm:
+      required: true
+      selector:
+        boolean:
+
+export_bus_log:
+  name: Export bus activity log
+  description: >-
+    Return broker-wide volatile SCSGATE MQTT activity. Messages cannot be
+    attributed to one gateway when gateways share a broker. The result may
+    reveal device addresses, commands, and occupancy patterns. Requires the bus
+    monitor option and explicit confirmation. Do not call from automations.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
+    limit:
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+    confirm:
+      required: true
+      selector:
+        boolean:
+
+clear_bus_log:
+  name: Clear bus activity log
+  description: Clear the shared, broker-wide in-memory SCSGATE activity log.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: scsgate
     confirm:
       required: true
       selector:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import re
 from collections.abc import Mapping
 from itertools import count
 from time import monotonic
@@ -12,6 +13,7 @@ from urllib.parse import urlsplit
 
 import aiohttp
 
+from .const import MAX_CALLBACK_LENGTH
 from .models import VALID_DEVICE_TYPES, GatewayDevice, GatewayStatus
 from .parsers import parse_devices, parse_status
 from .protocol_debug import ProtocolDebugAnalyzer
@@ -22,6 +24,17 @@ _SAFE_DEVICE_REQUESTS: Final = frozenset(
     {"query", "prepare", "start", "stop", "resend", "clear"}
 )
 _SAFE_RESET_DEVICES: Final = frozenset({"mqtt", "esp", "pic", "all"})
+_CALLBACK_PATH: Final = re.compile(r"^/[A-Za-z0-9._~/-]+$")
+
+
+def _valid_callback_path(path: str) -> bool:
+    """Reject ambiguous path normalization and secret-bearing syntax."""
+    if not _CALLBACK_PATH.fullmatch(path):
+        return False
+    segments = path.removeprefix("/").split("/")
+    return bool(segments) and all(
+        segment not in {"", ".", ".."} for segment in segments
+    )
 
 
 class GatewayError(Exception):
@@ -256,6 +269,18 @@ class GatewayClient:
         """Request firmware's current MQTT device table."""
         return await self.async_mqtt_devices("query")
 
+    async def async_query_devices_with_state(
+        self,
+    ) -> tuple[bool, list[GatewayDevice]]:
+        """Return whether the PIC-table import finished and its current devices."""
+        body = await self._async_request("/mqttdevices", {"request": "query"})
+        lowered = body.lower()
+        if "waiting query" in lowered:
+            return False, []
+        if "ok - list of discovered devices" not in lowered:
+            raise GatewayResponseError("Unexpected response from /mqttdevices")
+        return True, parse_devices(body)
+
     async def async_mqtt_devices(self, request: str) -> list[GatewayDevice]:
         if request not in _SAFE_DEVICE_REQUESTS:
             raise GatewayValidationError("Unsupported device management request")
@@ -310,7 +335,7 @@ class GatewayClient:
     async def async_configure_callback(self, callback: str) -> str:
         if (
             not callback
-            or len(callback) > 200
+            or len(callback) > MAX_CALLBACK_LENGTH
             or any(char.isspace() for char in callback)
         ):
             raise GatewayValidationError("Invalid callback")
@@ -321,10 +346,12 @@ class GatewayClient:
                 or not port_text.isdigit()
                 or not 1 <= int(port_text) <= 65535
                 or not path
+                or not _valid_callback_path(f"/{path}")
             ):
                 raise GatewayValidationError("Invalid callback")
         elif callback.startswith("/") and not callback.startswith("//"):
-            pass
+            if not _valid_callback_path(callback):
+                raise GatewayValidationError("Invalid callback")
         else:
             parsed = urlsplit(callback)
             if (
@@ -333,6 +360,8 @@ class GatewayClient:
                 or parsed.username
                 or parsed.password
                 or parsed.fragment
+                or parsed.query
+                or not _valid_callback_path(parsed.path)
             ):
                 raise GatewayValidationError("Invalid callback")
             try:
@@ -341,7 +370,11 @@ class GatewayClient:
                 raise GatewayValidationError(
                     "Callback host must be an IP address"
                 ) from err
-            if not _is_local_address(callback_address):
+            if (
+                not callback_address.is_private
+                or callback_address.is_loopback
+                or callback_address.is_link_local
+            ):
                 raise GatewayValidationError(
                     "Callback must target a private or local address"
                 )
