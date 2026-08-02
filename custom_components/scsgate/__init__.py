@@ -25,6 +25,7 @@ from .const import (
     CONF_ENABLE_RAW_COMMANDS,
     CONF_HOST,
     CONF_PORT,
+    CONF_PROTOCOL_DEBUG,
     DOMAIN,
     PLATFORMS,
     SERVICE_SEND_RAW_TELEGRAM,
@@ -72,6 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_get_clientsession(hass),
         entry.data[CONF_HOST],
         entry.data.get(CONF_PORT, 80),
+        protocol_debug=entry.options.get(CONF_PROTOCOL_DEBUG, False),
     )
     coordinator = ScsGateCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()

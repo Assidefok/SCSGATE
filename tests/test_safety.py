@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -11,7 +12,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.scsgate import ScsGateRuntimeData, _async_register_services
-from custom_components.scsgate.config_flow import _is_private_host
+from custom_components.scsgate.config_flow import ScsGateOptionsFlow, _is_private_host
 from custom_components.scsgate.const import (
     ATTR_CMD,
     ATTR_CONFIRM,
@@ -25,6 +26,7 @@ from custom_components.scsgate.const import (
     SERVICE_SEND_RAW_TELEGRAM,
 )
 from custom_components.scsgate.coordinator import ScsGateCoordinator
+from custom_components.scsgate.diagnostics import async_get_config_entry_diagnostics
 from custom_components.scsgate.models import GatewayStatus
 
 
@@ -59,6 +61,87 @@ async def test_coordinator_turns_transport_failure_into_update_failed(hass) -> N
 
     with pytest.raises(UpdateFailed, match="Unable to reach"):
         await coordinator._async_update_data()
+
+
+async def test_diagnostics_redact_identity_and_include_safe_transport_metrics(
+    hass,
+) -> None:
+    status = GatewayStatus(
+        host="192.168.1.20",
+        mac="AA:BB:CC:DD:EE:FF",
+        wifi_ssid="Private SSID",
+        mqtt_broker="configured",
+    )
+    metrics = {
+        "requests_total": 2,
+        "failures_total": 1,
+        "last_operation_id": "http-000002",
+        "last_endpoint": "/status",
+        "last_status": 200,
+        "last_duration_ms": 12,
+        "last_response_chars": 300,
+    }
+    protocol_debug = {
+        "enabled": True,
+        "observations_total": 1,
+        "anomalies_total": 0,
+        "retained_observations": [
+            {
+                "operation_id": "http-000002",
+                "endpoint": "/status",
+                "body_chars": 300,
+                "line_count": 8,
+                "html_tag_count": 10,
+                "key_value_count": 5,
+                "sensitive_label_count": 2,
+                "anomaly_codes": (),
+            }
+        ],
+    }
+    entry = SimpleNamespace(
+        entry_id="entry",
+        data={"host": "192.168.1.20", "port": 80},
+        options={"last_device_snapshot": ["private device"]},
+    )
+    hass.data[DOMAIN] = {
+        "entry": SimpleNamespace(
+            client=SimpleNamespace(
+                debug_metrics=metrics,
+                protocol_debug_diagnostics=protocol_debug,
+            ),
+            coordinator=SimpleNamespace(data=status),
+        )
+    }
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert diagnostics["entry"]["host"] == "**REDACTED**"
+    assert diagnostics["status"]["host"] == "**REDACTED**"
+    assert diagnostics["status"]["mac"] == "**REDACTED**"
+    assert diagnostics["status"]["wifi_ssid"] == "**REDACTED**"
+    assert diagnostics["status"]["mqtt_broker"] == "**REDACTED**"
+    assert diagnostics["options"]["last_device_snapshot"] == "[redacted]"
+    assert diagnostics["transport"] == metrics
+    assert diagnostics["protocol_debug"] == protocol_debug
+
+
+async def test_admin_operation_logs_only_safe_counts(caplog) -> None:
+    private_value = "private device name"
+
+    async def operation() -> list[str]:
+        return [private_value]
+
+    caplog.set_level(logging.DEBUG, logger="custom_components.scsgate.config_flow")
+    flow = object.__new__(ScsGateOptionsFlow)
+
+    result = await flow._run_operation("census", "query", operation())
+
+    assert result == [private_value]
+    assert "operation_id=admin-" in caplog.text
+    assert "category=census" in caplog.text
+    assert "action=query" in caplog.text
+    assert "result_count=1" in caplog.text
+    assert private_value not in caplog.text
 
 
 async def test_raw_service_requires_gateway_option_and_confirmation(hass) -> None:

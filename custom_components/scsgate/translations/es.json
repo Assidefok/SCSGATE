@@ -28,7 +28,7 @@
       "picprog_test": {"title": "Probar programación PIC", "data": {"confirm": "Ejecutar prueba"}},
       "picprog_flash": {"title": "Programar firmware PIC", "data": {"confirm": "FLASH identificador"}},
       "danger": {"title": "Borrar dispositivos aprendidos", "data": {"confirm": "CLEAR identificador"}},
-      "advanced": {"title": "Opciones avanzadas", "data": {"enable_raw_commands": "Activar servicio SCS crudo", "scan_interval": "Intervalo de estado (segundos)"}}
+      "advanced": {"title": "Opciones avanzadas", "description": "El debug de protocolo analiza en memoria todas las respuestas HTTP y solo conserva contadores estructurales y códigos de anomalía fijos. Nunca guarda ni registra el contenido sin procesar.", "data": {"enable_raw_commands": "Activar servicio SCS crudo", "enable_protocol_debug": "Activar análisis seguro del protocolo", "scan_interval": "Intervalo de estado (segundos)"}}
     },
     "error": {"cannot_connect": "No se puede conectar con el gateway.", "confirmation_required": "La confirmación no coincide.", "invalid_callback": "Callback privado no válido."}
   }

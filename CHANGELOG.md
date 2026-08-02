@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3
+
+- Add secret-free operation IDs, HTTP timing/status metrics, parser counts,
+  census progress, maintenance logging, and redacted transport diagnostics.
+- Add opt-in, bounded, in-memory protocol analysis for every HTTP response,
+  retaining only structural counters and fixed anomaly codes.
+- Redact exact `wifi_ssid`, `mqtt_broker`, and `mac` diagnostic fields.
+- Update HACS installation and safe-debug documentation for the public repo.
+
 ## 0.1.2
 
 - Replace the solid blue application-icon background with verified alpha
