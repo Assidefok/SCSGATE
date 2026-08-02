@@ -78,6 +78,17 @@ class ScsGateButton(CoordinatorEntity[ScsGateCoordinator], ButtonEntity):
                     result = self.coordinator.client.async_reset("mqtt")
                 if inspect.isawaitable(result):
                     await result
+                manager = getattr(
+                    self.coordinator.config_entry.runtime_data,
+                    "device_manager",
+                    None,
+                )
+                if manager is not None and key in {
+                    "query_devices",
+                    "resend_discovery",
+                    "reconnect_mqtt",
+                }:
+                    await manager.async_sync(f"button_{key}")
                 await self.coordinator.async_request_refresh()
         except AttributeError as err:
             _LOGGER.debug(

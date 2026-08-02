@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- Add a dynamic central Device Manager with periodic discovery of new devices.
+- Enrich MQTT Discovery with stable device/origin metadata and retained
+  republication while preserving existing topics and unique IDs.
+- Reconcile firmware payloads, MQTT birth/reconnect, census, edits, and manual
+  synchronization without feedback loops.
+- Add non-destructive migration, conflict Repairs, type 1 representation, and
+  a Discovery-manager rollback option.
+- Add firmware 7.004, migration, architecture, attribution, and safety
+  documentation; retain MIT and credit Guido Pagani/papergion.
+
 ## 0.3.0
 
 - Show device-table queries as `N` numbered entries with type, name and cover

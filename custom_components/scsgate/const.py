@@ -18,6 +18,9 @@ CONF_ADVANCED_TCP_DEBUG: Final = "enable_advanced_tcp_debug"
 CONF_ADVANCED_TCP_DEBUG_LIMIT: Final = "advanced_tcp_debug_limit"
 CONF_ADVANCED_TCP_DEBUG_DURATION: Final = "advanced_tcp_debug_duration"
 CONF_LAST_CENSUS: Final = "last_census"
+CONF_DISCOVERY_MANAGER: Final = "discovery_manager"
+CONF_TYPE_OVERRIDES: Final = "type_overrides"
+CONF_MIGRATION_COMPLETE: Final = "migration_complete"
 
 DEFAULT_PORT: Final = 80
 DEFAULT_SCAN_INTERVAL: Final = 300
@@ -30,6 +33,9 @@ DATA_CLIENT: Final = "client"
 DATA_COORDINATOR: Final = "coordinator"
 DATA_BUS_MONITOR: Final = "_broker_bus_monitor"
 DATA_BUS_MONITOR_LOCK: Final = "_broker_bus_monitor_lock"
+DATA_DISCOVERY_OWNER: Final = "_discovery_owner"
+
+DEFAULT_DISCOVERY_MANAGER: Final = True
 
 SERVICE_SEND_RAW_TELEGRAM: Final = "send_raw_telegram"
 SERVICE_EXPORT_BUS_LOG: Final = "export_bus_log"

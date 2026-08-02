@@ -15,6 +15,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import (
@@ -29,11 +30,14 @@ from .const import (
     CONF_ADVANCED_TCP_DEBUG_LIMIT,
     CONF_BUS_MONITOR,
     CONF_BUS_MONITOR_LIMIT,
+    CONF_DISCOVERY_MANAGER,
     CONF_LAST_CENSUS,
     CONF_PROTOCOL_DEBUG,
+    CONF_TYPE_OVERRIDES,
     DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
     DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
     DEFAULT_BUS_MONITOR_LIMIT,
+    DEFAULT_DISCOVERY_MANAGER,
     DOMAIN,
     MAX_CALLBACK_LENGTH,
 )
@@ -98,6 +102,19 @@ def _format_device_lines(devices: list[GatewayDevice]) -> str:
             line += f" — maxpos {device.maxpos}"
         lines.append(line)
     return "\n".join(lines) or "—"
+
+
+def _format_inventory_lines(rows: list[Any]) -> str:
+    """Render concise Device Manager rows."""
+    return (
+        "\n".join(
+            f"{row.bus_id} — type {row.device_type or '?'} — {row.name} — "
+            f"{row.component or 'read-only'} — {row.entity_id or 'pending'} — "
+            f"{row.health}"
+            for row in rows
+        )
+        or "—"
+    )
 
 
 class ScsGateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -168,6 +185,9 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
     def __init__(self) -> None:
         self._pending: dict[str, Any] = {}
         self._census_devices: list[GatewayDevice] = []
+        self._census_baseline_devices: list[GatewayDevice] = []
+        self._census_baseline_loaded = False
+        self._census_expected_new = 0
         self._census_focus = "all"
         self._census_active = False
         self._census_cleanup_task: asyncio.Task[None] | None = None
@@ -251,6 +271,8 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             step_id="init",
             menu_options=[
                 "status",
+                "device_manager",
+                "guided_census",
                 "devices",
                 "census",
                 "mqtt",
@@ -284,6 +306,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="devices",
             menu_options=[
+                "guided_census",
                 "device_query",
                 "discover_devices",
                 "discover_covers",
@@ -333,18 +356,21 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             },
         )
 
-    def _device_schema(self) -> vol.Schema:
-        return vol.Schema(
-            {
-                vol.Required("busid"): vol.All(str, vol.Match(r"^[0-9A-Fa-f]{2}$")),
-                vol.Required("type"): vol.All(vol.Coerce(int), vol.In(DEVICE_TYPES)),
-                vol.Required("devname"): vol.All(str, vol.Length(min=1, max=64)),
-                vol.Optional("maxpos", default=100): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, max=10000)
-                ),
-                vol.Required("resend", default=True): bool,
-            }
+    def _device_schema(self, *, include_resend: bool = True) -> vol.Schema:
+        fields: dict[vol.Marker, Any] = {
+            vol.Required("busid"): vol.All(str, vol.Match(r"^[0-9A-Fa-f]{2}$")),
+            vol.Required("type"): vol.All(vol.Coerce(int), vol.In(DEVICE_TYPES)),
+            vol.Required("devname"): vol.All(str, vol.Length(min=1, max=64)),
+            vol.Optional("maxpos", default=100): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=10000)
+            ),
+        }
+        if include_resend:
+            fields[vol.Required("resend", default=True)] = bool
+        fields[vol.Optional("type1_mode", default="switch")] = vol.In(
+            ["switch", "light"]
         )
+        return vol.Schema(fields)
 
     async def _save_device(self, user_input: dict[str, Any]) -> FlowResult:
         try:
@@ -356,7 +382,17 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             )
             if user_input["resend"]:
                 await self._client.async_mqtt_devices("resend")
-            return self._finish()
+            overrides = dict(self.config_entry.options.get(CONF_TYPE_OVERRIDES, {}))
+            if user_input["type"] == 1:
+                overrides[user_input["busid"].upper()] = user_input.get(
+                    "type1_mode", "switch"
+                )
+            runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+            manager = getattr(runtime, "device_manager", None)
+            if manager is not None:
+                manager.set_type_overrides(overrides)
+                await manager.async_sync("device_edit")
+            return self._finish({CONF_TYPE_OVERRIDES: overrides})
         except GatewayConnectionError:
             return self.async_show_form(
                 step_id="device_add",
@@ -393,6 +429,128 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                 "census_recovery_stop",
                 "census_resend",
             ],
+        )
+
+    async def async_step_device_manager(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show all firmware devices and central actions."""
+        runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        manager = getattr(runtime, "device_manager", None)
+        if user_input is not None:
+            action = user_input["action"]
+            if action == "manage":
+                return await self.async_step_devices()
+            if action == "add":
+                return await self.async_step_guided_census()
+            if action == "repair":
+                return await self.async_step_repair_preview()
+            if action == "done":
+                return self._finish()
+            if manager is not None:
+                try:
+                    await manager.async_sync("options_manual")
+                except Exception:
+                    return self._device_manager_form(
+                        manager.inventory, "cannot_connect"
+                    )
+        return self._device_manager_form(manager.inventory if manager else [])
+
+    def _device_manager_form(
+        self, rows: list[Any], error: str | None = None
+    ) -> FlowResult:
+        return self.async_show_form(
+            step_id="device_manager",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action", default="sync"): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=["sync", "manage", "add", "repair", "done"],
+                            translation_key="device_manager_action",
+                        )
+                    )
+                }
+            ),
+            errors={"base": error} if error else {},
+            description_placeholders={
+                "count": str(len(rows)),
+                "devices": _format_inventory_lines(rows),
+            },
+        )
+
+    async def async_step_repair_preview(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Preview and run repair after the user confirms a backup exists."""
+        runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        manager = getattr(runtime, "device_manager", None)
+        candidates = manager.repair_candidates if manager is not None else []
+        fields: dict[vol.Marker, Any] = {
+            vol.Required("backup_confirmed", default=False): vol.In([True]),
+            vol.Required("confirm", default=False): vol.In([True]),
+        }
+        if candidates:
+            fields[vol.Required("stale_topic")] = vol.In(candidates)
+        schema = vol.Schema(fields)
+        if user_input is not None:
+            try:
+                if manager is not None:
+                    if "stale_topic" in user_input:
+                        await manager.async_clear_stale_topic(user_input["stale_topic"])
+                    else:
+                        await manager.async_sync("guided_repair")
+            except Exception:
+                return self.async_show_form(
+                    step_id="repair_preview",
+                    data_schema=schema,
+                    errors={"base": "cannot_connect"},
+                )
+            return self._finish()
+        return self.async_show_form(
+            step_id="repair_preview",
+            data_schema=schema,
+            description_placeholders={"candidates": "\n".join(candidates) or "—"},
+        )
+
+    async def async_step_guided_census(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Guide a census and compare the result with the existing table."""
+        errors: dict[str, str] = {}
+        if not self._census_baseline_loaded:
+            try:
+                self._census_baseline_devices = await self._client.async_query_devices()
+                self._census_baseline_loaded = True
+            except (
+                GatewayConnectionError,
+                GatewayResponseError,
+                GatewayValidationError,
+            ):
+                errors["base"] = "cannot_connect"
+
+        if user_input is not None and not errors:
+            self._census_expected_new = user_input["new_device_count"]
+            self._census_focus = "covers" if user_input["include_covers"] else "all"
+            return await self._async_prepare_census(
+                "guided_census", self._census_focus, user_input
+            )
+
+        return self.async_show_form(
+            step_id="guided_census",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("new_device_count", default=1): vol.All(
+                        vol.Coerce(int), vol.Range(min=1, max=64)
+                    ),
+                    vol.Required("include_covers", default=False): bool,
+                    vol.Required("confirm", default=False): vol.In([True]),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "known_count": str(len(self._census_baseline_devices)),
+                "devices": _format_device_lines(self._census_baseline_devices),
+            },
         )
 
     async def _census(
@@ -504,6 +662,13 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {vol.Required("confirm", default=False): vol.In([True])}
             ),
+            description_placeholders={
+                "known_count": str(len(self._census_baseline_devices)),
+                "new_count": str(self._census_expected_new),
+                "expected_count": str(
+                    len(self._census_baseline_devices) + self._census_expected_new
+                ),
+            },
         )
 
     async def async_step_census_query(
@@ -596,31 +761,82 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
             if action == "scan_again":
                 if not await self._stop_census_best_effort():
                     return self._census_recovery_error()
-                if self._census_focus == "covers":
-                    return await self.async_step_discover_covers()
-                return await self.async_step_discover_devices()
+                return await self._async_prepare_census(
+                    "guided_census", self._census_focus, {"confirm": True}
+                )
             if action == "add_manual":
                 if not await self._stop_census_best_effort():
                     return self._census_recovery_error()
-                return await self.async_step_device_add()
+                return await self.async_step_census_manual_add()
             return await self.async_step_census_stop({"confirm": True})
         cover_count = sum(
             device.type in COVER_DEVICE_TYPES for device in self._census_devices
+        )
+        baseline_ids = {
+            device.bus_id.upper() for device in self._census_baseline_devices
+        }
+        new_devices = [
+            device
+            for device in self._census_devices
+            if device.bus_id.upper() not in baseline_ids
+        ]
+        missing_count = max(self._census_expected_new - len(new_devices), 0)
+        actions = (
+            ["scan_again", "add_manual", "accept_anyway"]
+            if missing_count
+            else ["accept", "scan_again", "add_manual"]
         )
         return self.async_show_form(
             step_id="census_review",
             data_schema=vol.Schema(
                 {
-                    vol.Required("action", default="accept"): vol.In(
-                        ["accept", "scan_again", "add_manual"]
+                    vol.Required(
+                        "action", default="scan_again" if missing_count else "accept"
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=actions,
+                            translation_key="census_review_action",
+                        )
                     )
                 }
             ),
             description_placeholders={
                 "count": str(len(self._census_devices)),
                 "cover_count": str(cover_count),
+                "known_count": str(len(self._census_baseline_devices)),
+                "expected_new": str(self._census_expected_new),
+                "new_count": str(len(new_devices)),
+                "missing_count": str(missing_count),
+                "new_devices": _format_device_lines(new_devices),
                 "devices": _format_device_lines(self._census_devices),
             },
+        )
+
+    async def async_step_census_manual_add(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Add one missing device, then return to the census comparison."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                await self._client.async_update_device(
+                    user_input["busid"],
+                    device_type=user_input["type"],
+                    name=user_input["devname"],
+                    max_position=user_input["maxpos"],
+                )
+                self._census_devices = await self._client.async_query_devices()
+                return await self.async_step_census_review()
+            except (
+                GatewayConnectionError,
+                GatewayResponseError,
+                GatewayValidationError,
+            ):
+                errors["base"] = "cannot_connect"
+        return self.async_show_form(
+            step_id="census_manual_add",
+            data_schema=self._device_schema(include_resend=False),
+            errors=errors,
         )
 
     async def async_step_census_stop(
@@ -635,6 +851,14 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                 await self._run_operation(
                     "census", "resend", self._client.async_mqtt_devices("resend")
                 )
+                runtime = None
+                if self.hass is not None:
+                    runtime = self.hass.data.get(DOMAIN, {}).get(
+                        self.config_entry.entry_id
+                    )
+                manager = getattr(runtime, "device_manager", None)
+                if manager is not None:
+                    await manager.async_sync("census")
             except (GatewayConnectionError, GatewayResponseError):
                 await self._stop_census_best_effort()
                 return self._census_recovery_error()
@@ -918,12 +1142,19 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                         CONF_ADVANCED_TCP_DEBUG_DURATION
                     ],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    CONF_DISCOVERY_MANAGER: user_input[CONF_DISCOVERY_MANAGER],
                 },
             )
         return self.async_show_form(
             step_id="advanced",
             data_schema=vol.Schema(
                 {
+                    vol.Required(
+                        CONF_DISCOVERY_MANAGER,
+                        default=self.config_entry.options.get(
+                            CONF_DISCOVERY_MANAGER, DEFAULT_DISCOVERY_MANAGER
+                        ),
+                    ): bool,
                     vol.Required(
                         CONF_ENABLE_RAW,
                         default=self.config_entry.options.get(CONF_ENABLE_RAW, False),

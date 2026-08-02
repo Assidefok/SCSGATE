@@ -12,8 +12,9 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .advanced_debug import AdvancedDebugError, AdvancedTcpDebugMonitor
@@ -32,15 +33,20 @@ from .const import (
     CONF_ADVANCED_TCP_DEBUG_LIMIT,
     CONF_BUS_MONITOR,
     CONF_BUS_MONITOR_LIMIT,
+    CONF_DISCOVERY_MANAGER,
     CONF_ENABLE_RAW_COMMANDS,
     CONF_HOST,
+    CONF_MIGRATION_COMPLETE,
     CONF_PORT,
     CONF_PROTOCOL_DEBUG,
+    CONF_TYPE_OVERRIDES,
     DATA_BUS_MONITOR,
     DATA_BUS_MONITOR_LOCK,
+    DATA_DISCOVERY_OWNER,
     DEFAULT_ADVANCED_TCP_DEBUG_DURATION,
     DEFAULT_ADVANCED_TCP_DEBUG_LIMIT,
     DEFAULT_BUS_MONITOR_LIMIT,
+    DEFAULT_DISCOVERY_MANAGER,
     DOMAIN,
     PLATFORMS,
     SERVICE_CLEAR_ADVANCED_DEBUG,
@@ -54,6 +60,7 @@ from .const import (
     VALID_RESPONSES,
 )
 from .coordinator import ScsGateCoordinator
+from .device_manager import DeviceManager, claim_global_namespace
 
 _HEX = re.compile(r"^[0-9A-Fa-f]+$")
 _LOGGER = logging.getLogger(__name__)
@@ -67,6 +74,7 @@ class ScsGateRuntimeData:
     coordinator: ScsGateCoordinator
     bus_monitor: BusMonitor | None = None
     advanced_debug: AdvancedTcpDebugMonitor | None = None
+    device_manager: DeviceManager | None = None
 
 
 async def _async_acquire_bus_monitor(
@@ -134,18 +142,101 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 CONF_ADVANCED_TCP_DEBUG_DURATION, DEFAULT_ADVANCED_TCP_DEBUG_DURATION
             ),
         )
+    device_manager: DeviceManager | None = None
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if entry.options.get(CONF_DISCOVERY_MANAGER, DEFAULT_DISCOVERY_MANAGER):
+        if claim_global_namespace(domain_data, entry.entry_id):
+            ir.async_delete_issue(
+                hass, DOMAIN, f"global_namespace_conflict_{entry.entry_id}"
+            )
+            gateway_id = str(
+                getattr(coordinator.data, "mac", None)
+                or entry.unique_id
+                or entry.entry_id
+            )
+            device_manager = DeviceManager(
+                hass,
+                entry.entry_id,
+                gateway_id,
+                client.async_query_devices,
+                entry.options.get(CONF_TYPE_OVERRIDES, {}),
+            )
+            domain_data[DATA_DISCOVERY_OWNER] = entry.entry_id
+        else:
+            ir.async_create_issue(
+                hass,
+                DOMAIN,
+                f"global_namespace_conflict_{entry.entry_id}",
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key="global_namespace_conflict",
+            )
+    else:
+        ir.async_delete_issue(
+            hass, DOMAIN, f"global_namespace_conflict_{entry.entry_id}"
+        )
+        ir.async_delete_issue(
+            hass, DOMAIN, f"migration_restart_required_{entry.entry_id}"
+        )
     entry.runtime_data = ScsGateRuntimeData(
         client=client,
         coordinator=coordinator,
         bus_monitor=bus_monitor,
         advanced_debug=advanced_debug,
+        device_manager=device_manager,
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.runtime_data
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        if device_manager is not None:
+            try:
+                await device_manager.async_start()
+                migration_issue = f"migration_restart_required_{entry.entry_id}"
+                if not entry.options.get(CONF_MIGRATION_COMPLETE, False):
+                    ir.async_create_issue(
+                        hass,
+                        DOMAIN,
+                        migration_issue,
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="migration_restart_required",
+                    )
+                    hass.config_entries.async_update_entry(
+                        entry,
+                        options={
+                            **entry.options,
+                            CONF_MIGRATION_COMPLETE: True,
+                        },
+                    )
+                else:
+                    ir.async_delete_issue(hass, DOMAIN, migration_issue)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Device Manager initial sync unavailable: %s", type(err).__name__
+                )
+
+            @callback
+            def schedule_periodic_device_sync() -> None:
+                """Discover newly learned devices on every coordinator interval."""
+
+                async def periodic_sync() -> None:
+                    try:
+                        await device_manager.async_ensure_started("periodic")
+                    except Exception:
+                        return
+
+                hass.async_create_task(periodic_sync())
+
+            entry.async_on_unload(
+                coordinator.async_add_listener(schedule_periodic_device_sync)
+            )
         _async_register_services(hass)
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
+        if device_manager is not None:
+            device_manager.async_stop()
+        if domain_data.get(DATA_DISCOVERY_OWNER) == entry.entry_id:
+            domain_data.pop(DATA_DISCOVERY_OWNER, None)
         if advanced_debug is not None:
             with suppress(AdvancedDebugError):
                 await advanced_debug.async_shutdown()
@@ -162,6 +253,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload entry resources and entity platforms."""
     runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    device_manager = getattr(runtime, "device_manager", None)
     advanced_debug = getattr(runtime, "advanced_debug", None)
     if advanced_debug is not None:
         try:
@@ -173,6 +265,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             return False
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        if device_manager is not None:
+            device_manager.async_stop()
         monitor = getattr(runtime, "bus_monitor", None)
         if monitor is not None:
             async with hass.data[DOMAIN][DATA_BUS_MONITOR_LOCK]:
@@ -180,6 +274,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 if not monitor.enabled:
                     hass.data[DOMAIN].pop(DATA_BUS_MONITOR, None)
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        if hass.data.get(DOMAIN, {}).get(DATA_DISCOVERY_OWNER) == entry.entry_id:
+            hass.data[DOMAIN].pop(DATA_DISCOVERY_OWNER, None)
         if not any(
             isinstance(value, ScsGateRuntimeData)
             for value in hass.data.get(DOMAIN, {}).values()

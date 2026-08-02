@@ -1,5 +1,7 @@
 # SCSGATE
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ![SCSGATE icon](brand/icon.png)
 
 Home Assistant custom integration for ESP32_SCSGATE firmware `VER_7.004`.
@@ -14,6 +16,8 @@ setup, diagnostics, device census, and guarded HTTP administration.
 
 - Gateway, firmware, Wi-Fi, and MQTT diagnostics.
 - Guided MQTT device census and Discovery republish.
+- Central Device Manager with automatic periodic inventory and retained,
+  enriched MQTT Discovery.
 - Manual device naming, type selection, and cover calibration.
 - Transient MQTT/Wi-Fi configuration; Home Assistant never stores passwords.
 - Guarded gateway/PIC reset, callback, and firmware tools.
@@ -31,6 +35,11 @@ open **Custom repositories**, add `https://github.com/Assidefok/SCSGATE` as an
 **Settings > Devices & services > Add integration**, select **SCSGATE**, and
 enter the gateway's private LAN IP address and HTTP port.
 
+After upgrading to v0.4, open **SCSGATE > Configure > Device Manager**. It
+shows every device currently returned by the gateway; there is no fixed limit.
+SCSGATE checks on setup, MQTT reconnect, census completion, edits, and every
+configured status interval (300 seconds by default).
+
 See the [installation and troubleshooting guide](docs/installation.md) for
 manual installation, upgrades, recovery, and safe debug logging.
 
@@ -43,7 +52,9 @@ manual installation, upgrades, recovery, and safe debug logging.
 - Raw SCS telegrams are disabled by default and require `confirm: true`.
 - There is no generic HTTP passthrough service.
 
-See [HTTP API coverage](docs/http-api.md) for the firmware route matrix and
+See the [Device Manager guide](docs/device-manager.md), the
+[modern firmware/manual guide](docs/firmware-7004-guide.md),
+[HTTP API coverage](docs/http-api.md), and
 [the primary sources](docs/research/scsgate-primary-sources.md) for the
 firmware/manual versions used by this integration.
 
@@ -93,12 +104,12 @@ same broker. Stock firmware 7.004 compiles its raw
 UART `SCSLOG` publisher out; on that build the viewer shows interpreted MQTT
 activity, not every electrical bus telegram.
 
-**View device table** now returns `N` numbered entries with address, type, name,
-and percentage-cover calibration when available. **Discover devices** runs the
-complete guided census. **Discover covers** uses the same firmware census but
-adds explicit UP/STOP/DOWN guidance and reports the number of covers separately.
-Firmware 7.004 has no safe cover-only discovery route, so both actions always
-show the complete learned table before it is accepted.
+**Add new SCS devices** opens a three-step wizard. It snapshots existing bus
+IDs, asks for the expected number of new devices, guides the physical bus
+actions, and compares the final table with the baseline. Missing devices default
+to rescan or in-wizard manual addition; acceptance stops learning before MQTT
+Discovery is republished. Firmware 7.004 has no cover-only census, so covers
+still require a global scan with explicit UP/STOP/DOWN actions.
 
 ### Advanced TCP/PIC capture
 
@@ -139,5 +150,7 @@ credentials, diagnostics, MAC/IP addresses, or MQTT/Wi-Fi configuration.
 
 ## Credits
 
-Based on the ESP32_SCSGATE firmware and documentation by papergion. SCSGATE,
-SCS, and BTicino/Legrand product names belong to their respective owners.
+Firmware, hardware design, and original manual: Guido Pagani/papergion,
+[official ESPscsgate_32_C3 repository](https://github.com/papergion/ESPscsgate_32_C3).
+See [NOTICE](NOTICE). SCSGATE, SCS, and BTicino/Legrand product names belong to
+their respective owners.

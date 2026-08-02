@@ -26,9 +26,17 @@ Wi-Fi or MQTT passwords submitted through the SCSGATE options flow.
 ## Updates and recovery
 
 Restart Home Assistant after installing or upgrading the integration. MQTT
-Discovery remains responsible for the individual light, switch, and cover
-entities; if they are missing, first confirm the gateway's MQTT connection and
-use **Resend MQTT Discovery** from the SCSGATE device.
+Discovery remains responsible for individual actuator entities, but v0.4
+manages its metadata inside SCSGATE. Open **Configure > Device Manager** to see
+the complete dynamic inventory and health. SCSGATE checks automatically every
+status interval (five minutes by default), so newly learned devices require no
+manual bus-ID entry. Use **Synchronize** after restoring connectivity.
+
+The v0.4 migration keeps existing Discovery topics and unique IDs, does not
+edit `.storage`, and does not delete duplicates or stale topics. Create a full
+backup, run the guided repair only if a Repair issue appears, then perform one
+planned Home Assistant restart. Disable the Discovery manager under Advanced
+options for firmware-only rollback.
 
 The integration's options flow contains guarded actions for census, network
 configuration, resets, and destructive operations. Read the confirmation text
@@ -110,13 +118,18 @@ buffer.
 
 ### Guided device learning
 
-Choose **Configure > Devices > Discover devices**, then physically operate each
-required SCS device. For focused guidance choose **Discover covers**, operate
-every device because firmware rebuilds one global table, and exercise
-UP/STOP/DOWN on every cover. Starting the import transfers the PIC's learned
-table to the ESP. SCSGATE polls without blocking Home Assistant, then shows `N`
-numbered entries with exact addresses, inferred types, names and available
-cover calibration. Accept the list, repeat the scan, or choose the manual-add
-path for a missing light, dimmer, cover, generic device, or alarm.
+Choose **Configure > Add new SCS devices**. The three-step wizard reads the
+current device table, asks how many devices are being added, then prepares the
+firmware census. Operate every existing device once and then each new device;
+exercise UP/STOP/DOWN on covers and change both state and level on dimmers.
+
+Starting the import transfers the PIC's learned table to the ESP. SCSGATE polls
+without blocking Home Assistant and compares bus IDs before and after the
+census. The review shows expected, detected and missing counts plus both the new
+IDs and the complete table. While devices are missing it defaults to repeating
+the census; manual addition stays inside the wizard. Acceptance always stops
+learning before republishing MQTT Discovery.
+
+Firmware 7.004 rebuilds one global table, even when only covers are new.
 If the browser flow is abandoned, a best-effort cleanup stops PIC learning
 after ten minutes; **Stop an abandoned census** is also available immediately.
