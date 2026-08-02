@@ -18,6 +18,9 @@ updates:
       test-dependencies:
         patterns:
           - "*"
+    ignore:
+      # pytest-homeassistant-custom-component pins the compatible pytest release.
+      - dependency-name: pytest
     labels:
       - dependencies
       - tests
