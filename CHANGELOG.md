@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Replace the solid blue application-icon background with verified alpha
+  transparency while retaining the blue/cyan and copper gateway artwork.
+
 ## 0.1.1
 
 - Make private-repository GitHub Actions checkout work with read-only contents.

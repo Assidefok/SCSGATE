@@ -28,7 +28,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Validate private HACS package structure
+        run: python scripts/validate_hacs.py
+      - name: Run official HACS validation when repository is public
+        if: ${{ github.event.repository.private == false }}
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
         with:
           category: integration
           comment: false
@@ -40,7 +45,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements_test.txt
       - run: python -m pip install --upgrade pip

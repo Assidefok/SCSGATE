@@ -31,7 +31,6 @@ class ScsGateCoordinator(DataUpdateCoordinator[Any]):
 
     def __init__(self, hass: HomeAssistant, client: Any, entry: ConfigEntry) -> None:
         self.client = client
-        self.config_entry = entry
         interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         super().__init__(
             hass,
@@ -39,6 +38,9 @@ class ScsGateCoordinator(DataUpdateCoordinator[Any]):
             name=DOMAIN,
             update_interval=timedelta(seconds=interval),
         )
+        # DataUpdateCoordinator initializes this attribute itself; assign the
+        # owning entry afterwards so current Home Assistant cannot reset it.
+        self.config_entry = entry
 
     async def _async_update_data(self) -> Any:
         """Read status through the protocol client's stable public method."""
