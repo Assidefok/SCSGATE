@@ -1,0 +1,17 @@
+SCSGATE attribution notice
+
+The SCSGATE Home Assistant custom integration and original documentation in
+this repository are Copyright (c) 2026 Assidefok and licensed under the MIT
+License in LICENSE.
+
+ESP32_SCSGATE firmware, the ESP32 gateway hardware design, and the original
+manual are works by Guido Pagani (papergion):
+https://github.com/papergion/ESPscsgate_32_C3
+
+Those upstream works are referenced for interoperability. They are not copied
+into this repository and are not relicensed under this repository's MIT
+License. Consult the upstream repository and author for their applicable terms.
+
+The local research file appunti_scs.pdf is not distributed. Unverified alarm,
+thermostat, and intercom mappings from private notes are not implementation
+claims and are not included as control features.

@@ -26,9 +26,17 @@ Wi-Fi or MQTT passwords submitted through the SCSGATE options flow.
 ## Updates and recovery
 
 Restart Home Assistant after installing or upgrading the integration. MQTT
-Discovery remains responsible for the individual light, switch, and cover
-entities; if they are missing, first confirm the gateway's MQTT connection and
-use **Resend MQTT Discovery** from the SCSGATE device.
+Discovery remains responsible for individual actuator entities, but v0.4
+manages its metadata inside SCSGATE. Open **Configure > Device Manager** to see
+the complete dynamic inventory and health. SCSGATE checks automatically every
+status interval (five minutes by default), so newly learned devices require no
+manual bus-ID entry. Use **Synchronize** after restoring connectivity.
+
+The v0.4 migration keeps existing Discovery topics and unique IDs, does not
+edit `.storage`, and does not delete duplicates or stale topics. Create a full
+backup, run the guided repair only if a Repair issue appears, then perform one
+planned Home Assistant restart. Disable the Discovery manager under Advanced
+options for firmware-only rollback.
 
 The integration's options flow contains guarded actions for census, network
 configuration, resets, and destructive operations. Read the confirmation text

@@ -1,5 +1,13 @@
 # SCSGATE HTTP API (firmware 7.004)
 
+## v0.4 Device Manager boundary
+
+Device Manager adds no arbitrary HTTP calls. It reads the existing
+`/mqttdevices` table through the fixed query route below, then reconciles MQTT
+Discovery through Home Assistant's configured broker. Periodic checks use the
+same safe query. Stale Discovery cleanup is an explicit broker operation after
+backup, preview, and confirmation; it is not a firmware HTTP route.
+
 All observed routes use unauthenticated HTTP GET. Keep gateway reachable only on a trusted LAN/VLAN.
 
 | Route | Client method | Risk |

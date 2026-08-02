@@ -46,6 +46,26 @@ def test_parse_real_7004_device_list_fixture() -> None:
     assert percentage_cover.maxpos == 16
 
 
+def test_parse_dynamic_eleven_device_inventory_fixture() -> None:
+    devices = parse_devices(
+        (FIXTURES / "devices_7004_eleven.html").read_text(encoding="utf-8")
+    )
+
+    assert [(item.bus_id, item.type) for item in devices] == [
+        ("24", 9),
+        ("34", 9),
+        ("41", 9),
+        ("42", 9),
+        ("43", 9),
+        ("11", 3),
+        ("12", 3),
+        ("22", 1),
+        ("23", 1),
+        ("33", 1),
+        ("32", 1),
+    ]
+
+
 def test_parser_debug_logs_counts_without_payload(
     caplog,
 ) -> None:

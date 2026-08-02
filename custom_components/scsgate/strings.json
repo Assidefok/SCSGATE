@@ -18,13 +18,15 @@
   },
   "options": {
     "step": {
-      "init": {"menu_options": {"status": "Status", "guided_census": "Add new SCS devices", "devices": "Devices", "census": "Census tools", "mqtt": "MQTT", "network": "Network", "callback": "Callback", "maintenance": "Maintenance", "danger": "Danger zone", "advanced": "Advanced"}},
+      "init": {"menu_options": {"status": "Status", "device_manager": "Device Manager", "guided_census": "Add new SCS devices", "devices": "Devices", "census": "Census tools", "mqtt": "MQTT", "network": "Network", "callback": "Callback", "maintenance": "Maintenance", "danger": "Danger zone", "advanced": "Advanced"}},
+      "device_manager": {"title": "SCSGATE Device Manager", "description": "{count} devices are known. MQTT is managed internally.\n\nBus ID — type — name — entity — health\n{devices}", "data": {"action": "Action"}},
+      "repair_preview": {"title": "Preview Discovery repair", "description": "Observed non-canonical stale topics:\n{candidates}\n\nA selected topic is cleared only after backup and confirmation. Otherwise SCSGATE only republishes enriched Discovery. Perform one planned restart.", "data": {"stale_topic": "Stale topic to clear", "backup_confirmed": "I created a backup", "confirm": "Apply the previewed repair"}},
       "status": {"title": "Gateway status", "description": "Refresh gateway diagnostics. Web tools: /test, /request and /help are available at the gateway address.", "data": {"refresh": "Refresh now"}},
       "devices": {"menu_options": {"guided_census": "Add new devices (wizard)", "device_query": "View device table", "discover_devices": "Discover devices", "discover_covers": "Discover covers", "device_add": "Add device", "device_edit": "Edit device"}},
       "device_query": {"title": "Query devices", "data": {"query": "Query now"}},
       "device_query_results": {"title": "Known devices", "description": "The gateway returned {count} device entries, including {cover_count} covers:\n\n{devices}", "data": {"done": "Done"}},
-      "device_add": {"title": "Add device", "description": "Use the two-digit hexadecimal bus address. Types: 1 switch/light, 3 or 4 dimmer, 8 or 18 cover, 9 or 19 percentage cover, 11 generic, 14 alarm.", "data": {"busid": "SCS bus ID", "type": "Device type", "devname": "Name", "maxpos": "Maximum position/time", "resend": "Republish MQTT Discovery"}},
-      "device_edit": {"title": "Edit device", "data": {"busid": "SCS bus ID", "type": "Device type", "devname": "Name", "maxpos": "Maximum position/time", "resend": "Republish MQTT Discovery"}},
+      "device_add": {"title": "Add device", "description": "Use the two-digit hexadecimal bus address. Types: 1 switch/light, 3 or 4 dimmer, 8 or 18 cover, 9 or 19 percentage cover, 11 generic, 14 alarm. Changing type 1 between switch and light changes domain; review references first.", "data": {"busid": "SCS bus ID", "type": "Device type", "devname": "Name", "maxpos": "Maximum position/time", "resend": "Republish MQTT Discovery", "type1_mode": "Type 1 representation"}},
+      "device_edit": {"title": "Edit device", "description": "Changing type 1 between switch and light changes entity domain. Review automations and dashboards first.", "data": {"busid": "SCS bus ID", "type": "Device type", "devname": "Name", "maxpos": "Maximum position/time", "resend": "Republish MQTT Discovery", "type1_mode": "Type 1 representation"}},
       "census": {"menu_options": {"discover_devices": "Discover devices", "discover_covers": "Discover covers", "census_recovery_stop": "Stop an abandoned census", "census_resend": "Republish Discovery"}},
       "guided_census": {"title": "Step 1 of 3 — Plan the census", "description": "The gateway currently knows {known_count} devices:\n\n{devices}\n\nEnter how many new devices you are adding. The wizard will compare bus IDs before and after the census, and will not suggest acceptance while devices are missing.", "data": {"new_device_count": "Number of new devices", "include_covers": "New devices include covers", "confirm": "Prepare the gateway"}},
       "census_prepare": {"title": "Prepare census", "description": "This changes the learned-device workflow. After confirming, operate every SCS device before starting the import.", "data": {"confirm": "I understand"}},
@@ -46,7 +48,7 @@
       "picprog_test": {"title": "Test PIC programming", "data": {"confirm": "Run test"}},
       "picprog_flash": {"title": "Flash PIC firmware", "description": "High-risk operation. Type FLASH followed by the gateway identifier.", "data": {"confirm": "Confirmation phrase"}},
       "danger": {"title": "Clear learned devices", "description": "This erases the learned device table. Type CLEAR followed by the gateway identifier.", "data": {"confirm": "Confirmation phrase"}},
-      "advanced": {"title": "Advanced options", "description": "The MQTT monitor records interpreted topics. Advanced TCP debug temporarily takes the only port 5045 client, reads the PIC log, and may reveal addresses and occupancy. Use only on a trusted LAN; it is disabled by default and restores stock PIC settings automatically.", "data": {"enable_raw_commands": "Enable raw SCS service", "enable_protocol_debug": "Enable safe HTTP protocol analysis", "scan_interval": "Status interval (seconds)", "enable_bus_monitor": "Enable broker-wide bus activity monitor", "bus_monitor_limit": "MQTT messages retained in memory", "enable_advanced_tcp_debug": "Enable advanced TCP/PIC debug", "advanced_tcp_debug_limit": "Debug messages retained in memory", "advanced_tcp_debug_duration": "Maximum capture duration (seconds)"}}
+      "advanced": {"title": "Advanced options", "description": "The MQTT monitor records interpreted topics. Advanced TCP debug temporarily takes the only port 5045 client, reads the PIC log, and may reveal addresses and occupancy. Use only on a trusted LAN; it is disabled by default and restores stock PIC settings automatically.", "data": {"discovery_manager": "Manage MQTT Discovery in SCSGATE", "enable_raw_commands": "Enable raw SCS service", "enable_protocol_debug": "Enable safe HTTP protocol analysis", "scan_interval": "Status interval (seconds)", "enable_bus_monitor": "Enable broker-wide bus activity monitor", "bus_monitor_limit": "MQTT messages retained in memory", "enable_advanced_tcp_debug": "Enable advanced TCP/PIC debug", "advanced_tcp_debug_limit": "Debug messages retained in memory", "advanced_tcp_debug_duration": "Maximum capture duration (seconds)"}}
     },
     "error": {
       "cannot_connect": "Cannot connect to the gateway.",
@@ -56,7 +58,14 @@
       "census_recovery_required": "A previous census may still be active. Stop the abandoned census before starting another."
     }
   },
+  "issues": {
+    "discovery_conflict": {"title": "SCSGATE Discovery conflict", "description": "Multiple MQTT entities use the same SCSGATE unique ID. Nothing was deleted. Open SCSGATE Device Manager and run the guided repair after a backup."},
+    "device_manager_offline": {"title": "SCSGATE Device Manager could not synchronize", "description": "The gateway or MQTT broker was unavailable. Existing entities were not changed. Restore connectivity and use Synchronize in Device Manager."},
+    "global_namespace_conflict": {"title": "Second SCSGATE gateway blocked", "description": "Firmware 7.004 uses the global scs MQTT namespace, so SCSGATE cannot safely manage Discovery for two gateways. Disable the Discovery manager on one entry."}
+    ,"migration_restart_required": {"title": "Restart Home Assistant to finish SCSGATE migration", "description": "SCSGATE published retained device metadata without changing entity identities. Create a backup if needed, then perform one planned Home Assistant restart."}
+  },
   "selector": {
+    "device_manager_action": {"options": {"sync": "Synchronize now", "manage": "Manage or edit devices", "add": "Add new devices", "repair": "Preview guided repair", "done": "Done"}},
     "census_review_action": {
       "options": {
         "accept": "Accept and publish MQTT Discovery",
