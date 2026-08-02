@@ -81,6 +81,23 @@ async def test_diagnostics_redact_identity_and_include_safe_transport_metrics(
         "last_duration_ms": 12,
         "last_response_chars": 300,
     }
+    protocol_debug = {
+        "enabled": True,
+        "observations_total": 1,
+        "anomalies_total": 0,
+        "retained_observations": [
+            {
+                "operation_id": "http-000002",
+                "endpoint": "/status",
+                "body_chars": 300,
+                "line_count": 8,
+                "html_tag_count": 10,
+                "key_value_count": 5,
+                "sensitive_label_count": 2,
+                "anomaly_codes": (),
+            }
+        ],
+    }
     entry = SimpleNamespace(
         entry_id="entry",
         data={"host": "192.168.1.20", "port": 80},
@@ -88,7 +105,10 @@ async def test_diagnostics_redact_identity_and_include_safe_transport_metrics(
     )
     hass.data[DOMAIN] = {
         "entry": SimpleNamespace(
-            client=SimpleNamespace(debug_metrics=metrics),
+            client=SimpleNamespace(
+                debug_metrics=metrics,
+                protocol_debug_diagnostics=protocol_debug,
+            ),
             coordinator=SimpleNamespace(data=status),
         )
     }
@@ -102,6 +122,7 @@ async def test_diagnostics_redact_identity_and_include_safe_transport_metrics(
     assert diagnostics["status"]["mqtt_broker"] == "**REDACTED**"
     assert diagnostics["options"]["last_device_snapshot"] == "[redacted]"
     assert diagnostics["transport"] == metrics
+    assert diagnostics["protocol_debug"] == protocol_debug
 
 
 async def test_admin_operation_logs_only_safe_counts(caplog) -> None:

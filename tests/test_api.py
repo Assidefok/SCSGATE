@@ -194,6 +194,30 @@ async def test_failed_request_updates_secret_free_metrics(
     assert gateway.debug_metrics["last_response_chars"] is None
 
 
+async def test_protocol_debug_analyzes_every_successful_response_safely(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    private_body = "ssid: PrivateNetwork password: PrivatePassword"
+    session = FakeSession(FakeResponse(body=private_body))
+    gateway = GatewayClient(  # type: ignore[arg-type]
+        session, "192.168.44.20", protocol_debug=True
+    )
+    monkeypatch.setattr(gateway, "async_validate_host", _bypass_host_validation)
+    caplog.set_level(logging.DEBUG, logger="custom_components.scsgate.api")
+
+    await gateway.async_get_status()
+    await gateway.async_get_help()
+
+    diagnostics = gateway.protocol_debug_diagnostics
+    assert diagnostics["enabled"] is True
+    assert diagnostics["observations_total"] == 2
+    assert len(diagnostics["retained_observations"]) == 2
+    assert "Protocol response analyzed" in caplog.text
+    assert private_body not in caplog.text
+    assert "PrivateNetwork" not in str(diagnostics)
+    assert "PrivatePassword" not in str(diagnostics)
+
+
 @pytest.mark.parametrize("host", ["8.8.8.8", "1.1.1.1", "2001:4860:4860::8888"])
 def test_public_gateway_addresses_are_rejected(host: str) -> None:
     with pytest.raises(GatewayValidationError, match="private or local"):

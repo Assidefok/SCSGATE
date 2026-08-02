@@ -14,6 +14,7 @@ import aiohttp
 
 from .models import VALID_DEVICE_TYPES, GatewayDevice, GatewayStatus
 from .parsers import parse_devices, parse_status
+from .protocol_debug import ProtocolDebugAnalyzer
 
 DEFAULT_TIMEOUT: Final = 10.0
 _LOGGER = logging.getLogger(__name__)
@@ -57,11 +58,14 @@ class GatewayClient:
         host: str,
         port: int = 80,
         timeout: float = DEFAULT_TIMEOUT,
+        *,
+        protocol_debug: bool = False,
     ) -> None:
         self._session = session
         self.host = host.strip().strip("[]")
         self.port = port
         self._timeout = aiohttp.ClientTimeout(total=timeout)
+        self._protocol_debug = ProtocolDebugAnalyzer(enabled=protocol_debug)
         self._operation_counter = count(1)
         self._debug_metrics: dict[str, int | str | None] = {
             "requests_total": 0,
@@ -96,6 +100,11 @@ class GatewayClient:
     def debug_metrics(self) -> dict[str, int | str | None]:
         """Return secret-free, in-memory transport metrics for diagnostics."""
         return dict(self._debug_metrics)
+
+    @property
+    def protocol_debug_diagnostics(self) -> dict[str, object]:
+        """Return the analyzer's secret-free, in-memory observations."""
+        return self._protocol_debug.diagnostics
 
     def _record_request(
         self,
@@ -173,6 +182,17 @@ class GatewayClient:
                         f"SCSGATE {path} returned HTTP {response.status}"
                     )
                 body = await response.text()
+                observation = self._protocol_debug.analyze(operation_id, path, body)
+                if observation is not None:
+                    _LOGGER.debug(
+                        "Protocol response analyzed operation_id=%s endpoint=%s "
+                        "anomalies=%s key_values=%s html_tags=%s",
+                        operation_id,
+                        path,
+                        len(observation.anomaly_codes),
+                        observation.key_value_count,
+                        observation.html_tag_count,
+                    )
                 duration_ms = self._record_request(
                     operation_id=operation_id,
                     endpoint=path,

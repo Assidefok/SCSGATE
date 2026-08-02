@@ -17,7 +17,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import GatewayClient, GatewayConnectionError, GatewayValidationError
-from .const import CONF_LAST_CENSUS, DOMAIN
+from .const import CONF_LAST_CENSUS, CONF_PROTOCOL_DEBUG, DOMAIN
 
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ENABLE_RAW = "enable_raw_commands"
@@ -116,10 +116,15 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
 
     @property
     def _client(self) -> GatewayClient:
+        runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        runtime_client = getattr(runtime, "client", None)
+        if isinstance(runtime_client, GatewayClient):
+            return runtime_client
         return GatewayClient(
             async_get_clientsession(self.hass),
             self.config_entry.data[CONF_HOST],
             self.config_entry.data[CONF_PORT],
+            protocol_debug=self.config_entry.options.get(CONF_PROTOCOL_DEBUG, False),
         )
 
     async def _status(self) -> Any:
@@ -627,6 +632,7 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                 data={
                     **self.config_entry.options,
                     CONF_ENABLE_RAW: user_input[CONF_ENABLE_RAW],
+                    CONF_PROTOCOL_DEBUG: user_input[CONF_PROTOCOL_DEBUG],
                     CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                 },
             )
@@ -637,6 +643,12 @@ class ScsGateOptionsFlow(config_entries.OptionsFlow):
                     vol.Required(
                         CONF_ENABLE_RAW,
                         default=self.config_entry.options.get(CONF_ENABLE_RAW, False),
+                    ): bool,
+                    vol.Required(
+                        CONF_PROTOCOL_DEBUG,
+                        default=self.config_entry.options.get(
+                            CONF_PROTOCOL_DEBUG, False
+                        ),
                     ): bool,
                     vol.Required(
                         CONF_SCAN_INTERVAL,

@@ -67,3 +67,24 @@ finished.
 The gateway's own `/test`, `/request`, and `/help` pages remain available on
 the trusted LAN. Do not attach their raw contents to a public issue because the
 firmware may display network or MQTT configuration.
+
+### Safe protocol analysis
+
+When ordinary debug logs are insufficient, open **SCSGATE > Configure >
+Advanced** and enable **Safe protocol analysis**. Reloading the config entry
+activates an in-memory analyzer for every successful gateway response,
+including status polling and administration actions.
+
+The analyzer reports only:
+
+- operation ID and fixed endpoint path;
+- response character, line, HTML-tag, and key/value counts;
+- the count of labels that may contain sensitive values;
+- fixed anomaly codes for empty/oversized responses, NUL characters, or
+  missing expected status/device markers.
+
+It never stores field values, request parameters, response bodies, hashes,
+device names, network identifiers, or credentials. Only the most recent 25
+observations remain in memory, and they are cleared on integration reload or
+Home Assistant restart. Download diagnostics after reproducing the fault, then
+turn the option off.

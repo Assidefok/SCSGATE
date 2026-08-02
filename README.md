@@ -67,6 +67,14 @@ never include hosts, query strings, response bodies, device names, callbacks,
 SSIDs, broker addresses, usernames, or passwords. Remove the override after
 troubleshooting to reduce log volume.
 
+For deeper firmware troubleshooting, enable **Safe protocol analysis** under
+the integration's **Advanced options**. It inspects every successful HTTP
+response in memory and detects empty or oversized pages, control characters,
+missing status/device markers, structural field counts, and changing HTML
+shapes. It retains only the latest 25 secret-free observations in memory and
+exports them through diagnostics; raw response content and values are discarded
+immediately. Disable it after reproducing the problem.
+
 ## Development
 
 ```bash

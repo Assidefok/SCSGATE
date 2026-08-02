@@ -28,7 +28,7 @@
       "picprog_test": {"title": "Test PIC programming", "data": {"confirm": "Run test"}},
       "picprog_flash": {"title": "Flash PIC firmware", "data": {"confirm": "FLASH identifier"}},
       "danger": {"title": "Clear learned devices", "data": {"confirm": "CLEAR identifier"}},
-      "advanced": {"title": "Advanced options", "data": {"enable_raw_commands": "Enable raw SCS service", "scan_interval": "Status interval (seconds)"}}
+      "advanced": {"title": "Advanced options", "description": "Protocol debug analyzes every HTTP response in memory and retains only structural counters and fixed anomaly codes. Raw content is never stored or logged.", "data": {"enable_raw_commands": "Enable raw SCS service", "enable_protocol_debug": "Enable safe protocol analysis", "scan_interval": "Status interval (seconds)"}}
     },
     "error": {"cannot_connect": "Cannot connect to the gateway.", "confirmation_required": "Confirmation does not match.", "invalid_callback": "Invalid private callback."}
   }

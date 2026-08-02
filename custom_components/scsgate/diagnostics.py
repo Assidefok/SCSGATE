@@ -42,12 +42,16 @@ async def async_get_config_entry_diagnostics(
     if "last_device_snapshot" in options:
         options["last_device_snapshot"] = "[redacted]"
     transport = getattr(getattr(runtime, "client", None), "debug_metrics", {})
+    protocol_debug = getattr(
+        getattr(runtime, "client", None), "protocol_debug_diagnostics", {}
+    )
     return async_redact_data(
         {
             "entry": dict(entry.data),
             "options": options,
             "status": status,
             "transport": transport,
+            "protocol_debug": protocol_debug,
         },
         _REDACT,
     )
