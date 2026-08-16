@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/Assidefok/SCSGATE/compare/v0.4.2...v0.5.0) (2026-08-16)
+
+
+### Features
+
+* add SCSGATE v0.4 device manager ([a65a88d](https://github.com/Assidefok/SCSGATE/commit/a65a88d1f57c61f5d85e196ccbc3fcd1071353a7))
+
+
+### Bug Fixes
+
+* package local brand icon variants ([d8a7b49](https://github.com/Assidefok/SCSGATE/commit/d8a7b495f528601ba7abf674950f79f001098ea7))
+* restore explicit dimmer power controls ([db6320a](https://github.com/Assidefok/SCSGATE/commit/db6320a3ef29c057136f137c58fe35137d9cd644))
+
 ## 0.4.2 (2026-08-17)
 
 - Package local Home Assistant brand icons at the official 256 px and 512 px
