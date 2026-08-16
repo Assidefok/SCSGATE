@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 (2026-08-16)
+
+- Make MQTT light power commands explicit for dimmers (`ON`/`OFF`) and send
+  the binary ON command before brightness updates.
+- Add regression coverage for the firmware 7.004 dimmer power contract.
+
 ## [0.4.0](https://github.com/Assidefok/SCSGATE/compare/v0.3.0...v0.4.0) (2026-08-02)
 
 
