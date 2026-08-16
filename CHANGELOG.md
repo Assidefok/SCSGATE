@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 (2026-08-17)
+
+- Package local Home Assistant brand icons at the official 256 px and 512 px
+  (`@2x`) sizes inside the SCSGATE integration directory.
+- Validate both packaged icon variants during HACS checks.
+
 ## 0.4.1 (2026-08-16)
 
 - Make MQTT light power commands explicit for dimmers (`ON`/`OFF`) and send

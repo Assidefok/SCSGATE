@@ -41,8 +41,8 @@ def load_json(path: Path) -> dict[str, object]:
     return value
 
 
-def validate_png(path: Path) -> None:
-    """Validate the required square HACS brand icon without extra packages."""
+def validate_png(path: Path, expected_size: int | None = None) -> None:
+    """Validate a square PNG brand icon without extra packages."""
     try:
         header = path.read_bytes()[:24]
     except OSError as err:
@@ -51,7 +51,9 @@ def validate_png(path: Path) -> None:
         fail(f"{path.relative_to(ROOT)} must be a PNG image")
     width, height = struct.unpack(">II", header[16:24])
     if width != height or width < 256:
-        fail("brand/icon.png must be square and at least 256 px")
+        fail(f"{path.relative_to(ROOT)} must be square and at least 256 px")
+    if expected_size is not None and width != expected_size:
+        fail(f"{path.relative_to(ROOT)} must be {expected_size}x{expected_size} px")
 
 
 def main() -> None:
@@ -103,7 +105,8 @@ def main() -> None:
         fail("manifest issue tracker URL does not match this repository")
 
     validate_png(ROOT / "brand" / "icon.png")
-    validate_png(integration / "brand" / "icon.png")
+    validate_png(integration / "brand" / "icon.png", 256)
+    validate_png(integration / "brand" / "icon@2x.png", 512)
     print(f"HACS package structure valid for SCSGATE {version}")
 
 
