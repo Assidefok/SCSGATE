@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 DISCOVERY_PREFIX: Final = "homeassistant"
 ORIGIN: Final = {
     "name": "SCSGATE",
-    "sw_version": "0.4.1",
+    "sw_version": "0.4.2",
     "support_url": "https://github.com/Assidefok/SCSGATE",
 }
 SUPPORTED_TYPES: Final = frozenset({1, 3, 4, 8, 9, 18, 19})
