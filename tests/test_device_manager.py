@@ -54,6 +54,9 @@ def test_dimmer_payload_preserves_identity_topics_and_adds_metadata() -> None:
     assert payload["state_topic"] == "scs/switch/state/11"
     assert payload["brightness_command_topic"] == "scs/switch/setlevel/11"
     assert payload["brightness_state_topic"] == "scs/switch/value/11"
+    assert payload["payload_on"] == "ON"
+    assert payload["payload_off"] == "OFF"
+    assert payload["on_command_type"] == "first"
     assert payload["device"]["identifiers"] == ["scsgate_aabbcc_11"]
     assert payload["origin"]["name"] == "SCSGATE"
 

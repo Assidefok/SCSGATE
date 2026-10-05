@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 DISCOVERY_PREFIX: Final = "homeassistant"
 ORIGIN: Final = {
     "name": "SCSGATE",
-    "sw_version": "0.4.0",
+    "sw_version": "0.4.2",
     "support_url": "https://github.com/Assidefok/SCSGATE",
 }
 SUPPORTED_TYPES: Final = frozenset({1, 3, 4, 8, 9, 18, 19})
@@ -108,7 +108,13 @@ def build_discovery_payload(
         payload |= {
             "command_topic": f"scs/switch/set/{bus_id}",
             "state_topic": f"scs/switch/state/{bus_id}",
+            "payload_on": "ON",
+            "payload_off": "OFF",
         }
+    if component == "light":
+        # Firmware 7.004 has a dedicated binary command parser. Keep power
+        # commands explicit even when the same service call changes brightness.
+        payload["on_command_type"] = "first"
     if device.type in {3, 4}:
         payload |= {
             "brightness_command_topic": f"scs/switch/setlevel/{bus_id}",
