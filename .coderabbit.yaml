@@ -1,6 +1,12 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: en-US
 reviews:
+  profile: chill
+  high_level_summary: false
+  review_status: false
+  review_info: false
+  in_progress_fortune: false
+  poem: false
   request_changes_workflow: true
   allow_author_approval: false
   auto_review:
