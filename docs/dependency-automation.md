@@ -1,7 +1,17 @@
 # Dependency automation
 
-Dependabot uses Conventional Commit titles. CodeRabbit reviews non-draft PRs,
-including bot PRs and incremental commits. Native GitHub auto-merge is enabled
+Dependabot uses Conventional Commit titles and checks weekly. Minor and patch
+updates are grouped into one PR per ecosystem; major updates remain separate.
+The pytest compatibility exclusion remains in place. Security updates retain
+their independent schedule.
+
+CodeRabbit reviews non-draft PRs, including bot PRs and incremental commits.
+Reviews and approvals remain enabled, while generated description summaries,
+review status messages, review metadata, fortunes and poems are disabled to
+reduce notification noise. GitHub notification delivery is still controlled by
+each user's notification and subscription settings.
+
+Native GitHub auto-merge is enabled
 only for verified same-repository Dependabot minor and patch updates targeting
 `main`. Major updates require manual review. No PR code runs in the privileged
 workflow.
@@ -30,7 +40,10 @@ release-please labels). Store its value as the **Actions repository secret**
 Choose an expiry and renew it before it expires. An equivalently scoped GitHub
 App installation token can also be used, provided it is refreshed automatically.
 
-The workflow fails with a clear message if the secret is missing. It uses the
+If the secret is missing, the workflow records a warning and skips auto-merge
+without creating a failed run for every dependency PR. Required CI and reviews
+remain enforced; merge these PRs manually until the credential is configured.
+When configured, it uses the
 credential to read protection and enable squash auto-merge, and pins the expected
 PR head. GitHub still enforces required CI, approvals and resolved conversations.
 Using a separate credential ensures merges trigger subsequent push and release
@@ -38,6 +51,9 @@ workflows; merges made with GITHUB_TOKEN would suppress those events.
 
 SCSGATE release-please also uses this token (or an existing RELEASE_PLEASE_TOKEN)
 so release PRs can run CI without requiring manual workflow approval.
+If neither secret is configured, release-please records a warning and skips
+release automation without creating a failed run on every push. No release is
+created until a credential is configured.
 
 ## Verification
 

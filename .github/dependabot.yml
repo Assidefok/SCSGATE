@@ -8,6 +8,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
       - ci
@@ -20,6 +27,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      test-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     ignore:
       # pytest-homeassistant-custom-component pins the compatible pytest release.
       - dependency-name: pytest
