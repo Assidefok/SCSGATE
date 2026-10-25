@@ -1,0 +1,65 @@
+name: Dependabot auto-merge
+
+# This workflow only reads PR metadata. Never check out or run PR code here.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main' &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Read verified Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # A dedicated token preserves push/release triggers after the merge.
+      # main uses classic protection; additional rulesets still apply at merge time.
+      - name: Require protected CI and review before enabling auto-merge
+        if: >-
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REQUIRED_CHECKS: '["tests","hassfest","hacs","pull-request-title"]'
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo '::error::Configure the AUTOMATION_TOKEN Actions secret; see docs/dependency-automation.md.'
+            exit 1
+          fi
+          gh api "repos/$GH_REPO/branches/main/protection" | jq -e --argjson required "$REQUIRED_CHECKS" '
+            .required_status_checks as $status |
+            (($status.contexts // []) + [$status.checks[]?.context] | unique) as $configured |
+            all($required[]; . as $check | $configured | index($check) != null) and
+            ($status.strict == true) and
+            (.required_pull_request_reviews.required_approving_review_count >= 1) and
+            (.required_pull_request_reviews.dismiss_stale_reviews == true) and
+            (.required_conversation_resolution.enabled == true) and
+            (.enforce_admins.enabled == true)
+          '
+
+      - name: Enable auto-merge for minor and patch updates
+        if: >-
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: gh pr merge --auto --squash --match-head-commit "$PR_HEAD" "$PR_URL"
