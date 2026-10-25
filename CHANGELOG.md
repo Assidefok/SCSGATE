@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/Assidefok/SCSGATE/compare/v0.4.2...v0.4.3) (2026-10-25)
+
+
+### Bug Fixes
+
+* **ci:** reduce dependency bot notification noise ([#25](https://github.com/Assidefok/SCSGATE/issues/25)) ([28e2caf](https://github.com/Assidefok/SCSGATE/commit/28e2caf2b30815251c97ddf008914ba10d0ebb4b))
+
 ## 0.4.2 (2026-08-17)
 
 - Package local Home Assistant brand icons at the official 256 px and 512 px
