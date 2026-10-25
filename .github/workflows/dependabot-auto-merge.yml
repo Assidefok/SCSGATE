@@ -21,7 +21,20 @@ jobs:
       contents: read
       pull-requests: read
     steps:
+      - name: Check automation credential availability
+        id: credential
+        env:
+          AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+        run: |
+          if [ -n "$AUTOMATION_TOKEN" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::Auto-merge is inactive: configure AUTOMATION_TOKEN; see docs/dependency-automation.md. PRs still require review and CI.'
+          fi
+
       - name: Read verified Dependabot metadata
+        if: steps.credential.outputs.configured == 'true'
         id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
@@ -31,17 +44,14 @@ jobs:
       # main uses classic protection; additional rulesets still apply at merge time.
       - name: Require protected CI and review before enabling auto-merge
         if: >-
-          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          steps.credential.outputs.configured == 'true' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch')
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
           GH_REPO: ${{ github.repository }}
           REQUIRED_CHECKS: '["tests","hassfest","hacs","pull-request-title"]'
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo '::error::Configure the AUTOMATION_TOKEN Actions secret; see docs/dependency-automation.md.'
-            exit 1
-          fi
           gh api "repos/$GH_REPO/branches/main/protection" | jq -e --argjson required "$REQUIRED_CHECKS" '
             .required_status_checks as $status |
             (($status.contexts // []) + [$status.checks[]?.context] | unique) as $configured |
@@ -55,8 +65,9 @@ jobs:
 
       - name: Enable auto-merge for minor and patch updates
         if: >-
-          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          steps.credential.outputs.configured == 'true' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch')
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
           GH_REPO: ${{ github.repository }}
